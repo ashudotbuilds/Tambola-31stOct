@@ -95,10 +95,14 @@ await sleep(2500)
 // A rejection cuts one marked number, and the event carries tickets.player_id
 // — a game_players.id, never the secret token the client holds. The hook used
 // to compare the two, so cuts never reached the player's own ticket.
+// A cut only exists while a marked number is still uncut, and the full_house
+// rejection above may already have consumed the only candidate.
+const uncutMarked = (m) => m?.marked?.filter((n) => !(m.cut ?? []).includes(n)).length ?? 0
+
 let me = null
-for (let i = 0; i < 12 && !(me?.marked?.length); i++) {
+for (let i = 0; i < 20 && uncutMarked(me) === 0; i++) {
   await rpc(game, 'draw_number', { p_game_id: host.game_id, p_host_token: host.host_token })
-  await sleep(400)
+  await sleep(350)
   const snapshot = await rpc(game, 'get_game_state', {
     p_game_id: host.game_id,
     p_player_token: player.player_token,
@@ -107,13 +111,14 @@ for (let i = 0; i < 12 && !(me?.marked?.length); i++) {
 }
 
 let cutFailure = null
-if (!me?.marked?.length) {
-  cutFailure = 'no marked number after 12 draws, could not exercise a cut'
+if (uncutMarked(me) === 0) {
+  cutFailure = `no uncut marked number after 20 draws (marked=${JSON.stringify(me?.marked)} cut=${JSON.stringify(me?.cut)})`
 } else {
+  // full_house cannot be satisfied this early, so this is guaranteed to cut.
   const rejected = await rpc(game, 'submit_claim', {
     p_game_id: host.game_id,
     p_player_token: player.player_token,
-    p_claim: 'early_five',
+    p_claim: 'full_house',
   })
   await sleep(2500)
   const evt = seen.find((s) => s.name === 'ticket_updated')
