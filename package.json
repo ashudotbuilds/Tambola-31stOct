@@ -1,0 +1,34 @@
+{
+  "name": "acm-engday-tambola",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "node scripts/smoke.mjs",
+    "test:parity": "node --experimental-strip-types scripts/claims-parity.ts",
+    "test": "npm run typecheck && npm run test:parity && npm run test:smoke",
+    "db:migrate": "npx -y @insforge/cli db migrations up --all",
+    "db:status": "npx -y @insforge/cli db migrations list"
+  },
+  "dependencies": {
+    "@insforge/sdk": "^1.5.2",
+    "next": "^15.1.6",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3"
+  }
+}

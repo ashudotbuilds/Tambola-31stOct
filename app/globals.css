@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-ink text-slate-100 antialiased;
+  background-image:
+    radial-gradient(circle at 20% -10%, rgba(34, 211, 238, 0.12), transparent 45%),
+    radial-gradient(circle at 85% 0%, rgba(163, 230, 53, 0.1), transparent 40%);
+  background-attachment: fixed;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-edge bg-panel/80 backdrop-blur;
+  }
+
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl border border-edge
+           bg-panel px-4 py-3 text-sm font-semibold uppercase tracking-wide text-slate-200
+           transition hover:border-cyan/60 hover:text-cyan
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan
+           disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-edge disabled:hover:text-slate-200;
+  }
+
+  .btn-primary {
+    @apply border-cyan/70 bg-cyan/15 text-cyan hover:bg-cyan/25;
+  }
+
+  .btn-danger {
+    @apply border-rose/70 bg-rose/15 text-rose hover:bg-rose/25;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-edge bg-ink/80 px-4 py-3 text-base text-slate-100
+           placeholder:text-slate-500 focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan;
+  }
+
+  .label {
+    @apply mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-400;
+  }
+}
+
+/* A ticket cell that is numbered, called and not cut. */
+@layer utilities {
+  .cell {
+    @apply relative flex aspect-square items-center justify-center rounded-md border text-xs font-bold
+           tabular-nums transition-colors sm:rounded-lg sm:text-sm;
+  }
+}
