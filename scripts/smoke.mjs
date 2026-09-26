@@ -69,7 +69,7 @@ const host = await rpc(game, 'create_game', { p_host_name: 'SmokeHost' })
 const channel = `game:${host.game_id}`
 console.log(`\nTechnical Tambola smoke test\ngame ${host.code}  (${channel})\n`)
 
-const EVENTS = ['player_joined', 'status_changed', 'number_called', 'claim_result', 'scoreboard']
+const EVENTS = ['player_joined', 'status_changed', 'number_called', 'claim_result', 'scoreboard', 'presence:join']
 
 console.log('single anonymous connection')
 const a = newClient()
@@ -94,6 +94,12 @@ const draw1 = await rpc(game, 'draw_number', { p_game_id: host.game_id, p_host_t
 const call1 = await aView.waitFor('number_called')
 check('number_called delivered', call1?.number === draw1.number, JSON.stringify(call1))
 check('clue rides along', typeof call1?.clue === 'string' && call1.clue.length > 2, String(call1?.clue))
+// useGameRoom discards any event whose meta.channel is not this room. The
+// platform namespaces broadcasts as `realtime:<channel>`, so a change to that
+// contract would stop the UI rendering events while the socket still looks
+// healthy. Pin the raw shape here; src/lib/channel.ts is pinned in parity.
+check('broadcast is namespaced as realtime:<channel>',
+  call1?.meta?.channel === `realtime:${channel}`, JSON.stringify(call1?.meta ?? null))
 
 const badClaim = await rpc(game, 'submit_claim', {
   p_game_id: host.game_id,
@@ -116,6 +122,12 @@ await b.realtime.connect()
 const subB = await b.realtime.subscribe(channel)
 check('second anon subscribed', subB.ok === true, subB.error?.message ?? '')
 await sleep(1200)
+
+// Presence deltas are the other half of the contract: they arrive on the bare
+// channel, never namespaced, so the device counter must accept that shape too.
+const joinEvent = await aView.waitFor('presence:join')
+check('presence delta arrives on the bare channel',
+  joinEvent?.meta?.channel === channel, JSON.stringify(joinEvent?.meta ?? null))
 
 // Let everything in flight settle before counting.
 await sleep(1500)

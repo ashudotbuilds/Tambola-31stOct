@@ -1,19 +1,25 @@
 /**
- * Parity test: the TypeScript claim mirror must agree with the SQL rules.
+ * Parity test: the TypeScript mirrors must agree with the server.
  *
  * The claim buttons in the player UI are gated by isClaimEligible() in
  * src/lib/claims.ts, a hand-written mirror of the SQL function
  * tambola_claim_ok(). Drift between the two is invisible at runtime: a player
  * either cannot claim a line they earned, or gets a button the server punishes.
  *
+ * The realtime event feed is filtered by channelOf() in src/lib/channel.ts,
+ * which strips the `realtime:` namespace the platform puts on broadcasts. A
+ * literal comparison drops every event while the socket still looks healthy —
+ * so both shapes the backend emits are pinned here.
+ *
  * So: ask the server for its verdict on hundreds of random tickets, recompute
  * each verdict with the mirror, and compare.
  *
- * Run:  node --experimental-strip-types scripts/claims-parity.mjs
+ * Run:  node --experimental-strip-types scripts/claims-parity.ts
  */
 import { readFileSync } from 'node:fs'
 import { createClient } from '@insforge/sdk'
 import { isClaimEligible } from '../src/lib/claims.ts'
+import { channelOf } from '../src/lib/channel.ts'
 import type { ClaimType, Ticket } from '../src/lib/types.ts'
 
 const CLAIM_TYPES = [
@@ -25,6 +31,34 @@ const CLAIM_TYPES = [
   'full_house',
   'second_full_house',
 ]
+
+// ---------------------------------------------------------------------------
+// Realtime channel filter
+// ---------------------------------------------------------------------------
+// Captured verbatim from the live backend: broadcasts arrive namespaced,
+// presence deltas arrive bare. useGameRoom must accept both as the same room.
+const ROOM = 'game:ea25cbf9-10f5-44d1-93b5-9298efc0e623'
+const channelCases: Array<{ label: string; payload: unknown; expect: string | null }> = [
+  {
+    label: 'database broadcast (number_called, player_joined, ...)',
+    payload: { number: 84, meta: { channel: `realtime:${ROOM}` } },
+    expect: ROOM,
+  },
+  { label: 'presence delta (presence:join/leave)', payload: { meta: { channel: ROOM } }, expect: ROOM },
+  { label: 'foreign room is not ours', payload: { meta: { channel: 'realtime:game:other' } }, expect: 'game:other' },
+  { label: 'connection lifecycle has no channel', payload: undefined, expect: null },
+  { label: 'disconnect reason is a bare string', payload: 'transport close', expect: null },
+]
+
+const channelFailures = channelCases.filter((c) => channelOf(c.payload) !== c.expect)
+console.log(`\nRealtime channel filter: ${channelCases.length - channelFailures.length}/${channelCases.length} shapes`)
+if (channelFailures.length > 0) {
+  for (const c of channelFailures) {
+    console.log(`  MISMATCH ${c.label}: got ${JSON.stringify(channelOf(c.payload))}, want ${JSON.stringify(c.expect)}`)
+  }
+  console.log('  Every broadcast would be silently discarded by useGameRoom.\n')
+  process.exit(1)
+}
 
 const env = Object.fromEntries(
   readFileSync(new URL('../.env.local', import.meta.url), 'utf8')

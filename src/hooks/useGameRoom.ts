@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { insforge } from '@/lib/insforge'
+import { channelOf } from '@/lib/channel'
 import { getGameState } from '@/lib/api'
 import { hasNumber } from '@/lib/claims'
 import type {
@@ -64,6 +65,11 @@ export function useGameRoom(
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers
 
+  // Events are addressed by player id, not by the secret token the client
+  // holds, so remember which player this device is once the state lands.
+  const meIdRef = useRef<string | null>(null)
+  meIdRef.current = state?.me?.player_id ?? null
+
   const channel = gameId ? `game:${gameId}` : null
 
   const load = useCallback(async () => {
@@ -102,7 +108,8 @@ export function useGameRoom(
       <T,>(fn: (event: T) => void) =>
       (payload: T & { meta?: { channel?: string } }) => {
         if (disposed) return
-        if (payload?.meta?.channel && payload.meta.channel !== channel) return
+        const from = channelOf(payload)
+        if (from && from !== channel) return
         fn(payload)
       }
 
@@ -212,19 +219,34 @@ export function useGameRoom(
         )
 
         // A cut only ever affects one player, so only that player refetches.
+        // tickets.player_id is a game_players.id, never the secret token.
         offs.push(
           on('ticket_updated', guard<TicketUpdatedEvent>((event) => {
-            if (token && event.player_id === token) {
+            if (event.player_id === meIdRef.current) {
               handlersRef.current.onSelfCut?.(event)
+            } else if (!meIdRef.current && token) {
+              // State has not landed yet, so the cut cannot be attributed.
+              void load()
             }
           })),
         )
+
+        // The subscribe() snapshot is a point in time, so keep the device
+        // counter in step with the presence deltas that follow it.
+        const syncPresence = () => {
+          if (!disposed) setConnected(bus.getPresenceState(channel).length)
+        }
+        offs.push(on('presence:join', guard(syncPresence)))
+        offs.push(on('presence:leave', guard(syncPresence)))
 
         const markOffline = () => {
           if (!disposed) setConnection('offline')
         }
         const markLive = () => {
-          if (!disposed) setConnection('live')
+          if (disposed) return
+          setConnection('live')
+          // A reconnect hands back a fresh snapshot, so re-read the headcount.
+          setConnected(bus.getPresenceState(channel).length)
         }
         bus.on('connect', markLive as never)
         bus.on('disconnect', markOffline as never)
