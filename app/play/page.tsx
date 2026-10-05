@@ -8,6 +8,7 @@ import { ClaimButtons } from '@/components/ClaimButtons'
 import { Leaderboard } from '@/components/Leaderboard'
 import { NumberBoard } from '@/components/NumberBoard'
 import { Ticket } from '@/components/Ticket'
+import { LobbyTutorialSimulator } from '@/components/LobbyTutorialSimulator'
 import { sessions, setPlayerMarks, submitClaim } from '@/lib/api'
 import { claimLabel } from '@/lib/claims'
 import { play } from '@/lib/sound'
@@ -356,6 +357,16 @@ export default function PlayerScreen() {
         </details>
       )}
 
+      {/* Interactive Lobby Tutorial & Simulation */}
+      {status === 'lobby' && (
+        <LobbyTutorialSimulator
+          ticket={me?.ticket ?? null}
+          playerMarked={playerMarked}
+          onToggleCell={handleToggleCell}
+          customBank={customBank}
+        />
+      )}
+
       {/* The Technical Tambola Ticket - Click & Unclick Manual Selection */}
       <Ticket
         ticket={me?.ticket ?? null}
@@ -369,9 +380,10 @@ export default function PlayerScreen() {
 
       {/* Claim Buttons: Enabled ONLY when player manually clicked required cells! */}
       {status === 'lobby' ? (
-        <p className="rounded-xl border border-amber/50 bg-amber/10 px-4 py-3 text-center text-xs sm:text-sm text-amber">
-          Waiting for the host to start the game.
-        </p>
+        <div className="rounded-xl border border-amber/50 bg-amber/10 px-4 py-3 text-center text-xs sm:text-sm text-amber flex items-center justify-center gap-2">
+          <span className="animate-spin text-base">⏳</span>
+          <span>Waiting for the host to start the game · Practice solving and marking clues above!</span>
+        </div>
       ) : (
         <ClaimButtons
           ticket={me?.ticket ?? null}
