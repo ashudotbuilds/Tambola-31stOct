@@ -208,3 +208,18 @@ export async function updateGameBank(
   )
 }
 
+export async function setPlayerMarks(
+  gameId: string,
+  playerToken: string,
+  marked: number[],
+): Promise<{ ok: boolean; marked: number[] }> {
+  return requireOk(
+    await rpc<{ ok: boolean; marked: number[] }>('set_player_marks', {
+      p_game_id: gameId,
+      p_player_token: playerToken,
+      p_marked: marked,
+    }),
+  )
+}
+
+

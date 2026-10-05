@@ -8,11 +8,11 @@ import { ClaimButtons } from '@/components/ClaimButtons'
 import { Leaderboard } from '@/components/Leaderboard'
 import { NumberBoard } from '@/components/NumberBoard'
 import { Ticket } from '@/components/Ticket'
-import { sessions, submitClaim } from '@/lib/api'
+import { sessions, setPlayerMarks, submitClaim } from '@/lib/api'
 import { claimLabel } from '@/lib/claims'
 import { play } from '@/lib/sound'
 import type { ClaimType, PlayerSession } from '@/lib/types'
-import { cutSet, deriveMarked, useGameRoom } from '@/hooks/useGameRoom'
+import { cutSet, useGameRoom } from '@/hooks/useGameRoom'
 import { getTechnicalItem, type TechnicalItem } from '@/lib/technicalBank'
 import { ThemeToggle, useTheme } from '@/lib/theme'
 
@@ -73,11 +73,16 @@ export default function PlayerScreen() {
   const cut = useMemo(() => cutSet(me), [me])
   const customBank = (state?.settings?.custom_bank as TechnicalItem[]) ?? null
 
-  // Server-confirmed marks
-  const serverMarked = useMemo(
-    () => deriveMarked(me?.ticket, room.calledNumbers, cut),
-    [me?.ticket, room.calledNumbers, cut],
-  )
+  // If local marks are empty but server has saved marks from earlier session, restore them
+  useEffect(() => {
+    if (!me?.marked || me.marked.length === 0) return
+    setPlayerMarked((prev) => {
+      if (prev.size === 0) {
+        return new Set(me.marked)
+      }
+      return prev
+    })
+  }, [me?.marked])
 
   // Revealed calls from host settings
   const revealedSeqs = useMemo(
@@ -85,33 +90,8 @@ export default function PlayerScreen() {
     [state?.settings?.revealed_seqs],
   )
 
-  const revealedNumbers = useMemo(() => {
-    const set = new Set<number>()
-    for (const call of state?.calls ?? []) {
-      if (revealedSeqs.has(call.seq)) {
-        set.add(call.number)
-      }
-    }
-    return set
-  }, [state?.calls, revealedSeqs])
-
-  // Automatically keep playerMarked up-to-date with serverMarked
-  useEffect(() => {
-    if (serverMarked.size === 0) return
-    setPlayerMarked((prev) => {
-      let changed = false
-      const next = new Set(prev)
-      for (const n of serverMarked) {
-        if (!next.has(n)) {
-          next.add(n)
-          changed = true
-        }
-      }
-      return changed ? next : prev
-    })
-  }, [serverMarked])
-
-  // Save playerMarked to localStorage
+  // Manual clicking and unclicking: player uses their own knowledge!
+  // NO AUTO-SELECTING.
   const handleToggleCell = useCallback(
     (cell: number) => {
       if (!session) return
@@ -119,18 +99,26 @@ export default function PlayerScreen() {
         const next = new Set(prev)
         if (next.has(cell)) {
           next.delete(cell)
+          play('reject')
         } else {
           next.add(cell)
           play('call')
         }
+
+        const arrayMarks = Array.from(next)
+        // Save to localStorage
         try {
           localStorage.setItem(
             `tt.marked.${session.game_id}.${session.player_id}`,
-            JSON.stringify(Array.from(next)),
+            JSON.stringify(arrayMarks),
           )
         } catch {
           // ignore
         }
+
+        // Asynchronously sync with the database
+        void setPlayerMarks(session.game_id, session.player_token, arrayMarks).catch(() => {})
+
         return next
       })
     },
@@ -299,7 +287,7 @@ export default function PlayerScreen() {
               </div>
             ) : (
               <p className="text-xs italic text-slate-500 pt-1">
-                The host has not revealed the answer yet. If you know it, find and tap it on your ticket!
+                Decode the question and click matching cells on your ticket!
               </p>
             )}
           </div>
@@ -326,20 +314,18 @@ export default function PlayerScreen() {
         </details>
       )}
 
-      {/* The Technical Tambola Ticket */}
+      {/* The Technical Tambola Ticket - Click & Unclick Manual Selection */}
       <Ticket
         ticket={me?.ticket ?? null}
-        marked={serverMarked}
-        cut={cut}
         playerMarked={playerMarked}
-        revealedNumbers={revealedNumbers}
+        cut={cut}
         latest={call?.number ?? null}
         customBank={customBank}
         onToggleCell={handleToggleCell}
         showNumbersOnly={showNumbersOnly}
       />
 
-      {/* Claim Buttons */}
+      {/* Claim Buttons: Enabled ONLY when player manually clicked required cells! */}
       {status === 'lobby' ? (
         <p className="rounded-xl border border-amber/50 bg-amber/10 px-4 py-3 text-center text-sm text-amber">
           Waiting for the host to start the game.
@@ -347,7 +333,7 @@ export default function PlayerScreen() {
       ) : (
         <ClaimButtons
           ticket={me?.ticket ?? null}
-          marked={serverMarked}
+          marked={playerMarked}
           cut={cut}
           state={state}
           won={room.wonClaims}

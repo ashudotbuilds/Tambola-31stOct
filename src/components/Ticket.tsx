@@ -7,19 +7,15 @@ import { useTheme } from '@/lib/theme'
 
 interface Props {
   ticket: TicketType | null
-  /** Officially marked numbers from server */
-  marked: ReadonlySet<number>
+  /** Numbers manually clicked/selected by the player */
+  playerMarked: ReadonlySet<number>
   /** Numbers cut by penalty */
   cut: ReadonlySet<number>
-  /** Numbers manually clicked/daubed by the player */
-  playerMarked?: ReadonlySet<number>
-  /** Numbers whose answers have officially been revealed by the host */
-  revealedNumbers?: ReadonlySet<number>
-  /** Latest called number, flashed on arrival */
+  /** Called number, flashed on arrival */
   latest?: number | null
   /** Custom bank of questions/terms if configured */
   customBank?: TechnicalItem[] | null
-  /** Callback when player clicks a cell to manually mark/unmark */
+  /** Callback when player clicks a cell to select / unselect */
   onToggleCell?: (cell: number) => void
   className?: string
   /** Whether to show raw numbers instead of technical terms */
@@ -28,10 +24,8 @@ interface Props {
 
 export function Ticket({
   ticket,
-  marked,
+  playerMarked,
   cut,
-  playerMarked = new Set(),
-  revealedNumbers = new Set(),
   latest = null,
   customBank = null,
   onToggleCell,
@@ -87,34 +81,21 @@ export function Ticket({
             const item = getTechnicalItem(cell, customBank)
             const isCut = cut.has(cell)
             const isLatest = flash === cell
+            const isSelected = !isCut && playerMarked.has(cell)
 
-            // Status checks
-            const isOfficiallyRevealed = revealedNumbers.has(cell) || marked.has(cell)
-            const hasPlayerClicked = playerMarked.has(cell)
-            const isConfirmed = !isCut && ((marked.has(cell) && hasPlayerClicked) || (marked.has(cell) && isOfficiallyRevealed))
-            const isPendingSelfMark = !isCut && hasPlayerClicked && !isOfficiallyRevealed
-            const isRevealedUnclicked = !isCut && isOfficiallyRevealed && !hasPlayerClicked && !marked.has(cell)
-
-            // Dynamic cell appearance matching user's reference image in light mode
+            // Dynamic cell appearance
             let cellStyle = ''
             if (isCut) {
               cellStyle = isLight
                 ? 'border-red-300 bg-red-50 text-red-700 line-through opacity-75'
                 : 'border-rose/60 bg-rose/10 text-rose line-through'
-            } else if (isConfirmed) {
+            } else if (isSelected) {
+              // User has manually clicked and selected this cell
               cellStyle = isLight
-                ? 'border-emerald-400 bg-emerald-50 text-emerald-900 shadow-sm font-bold ring-1 ring-emerald-400/50'
-                : 'border-lime/80 bg-lime/20 text-lime font-bold ring-1 ring-lime/40'
-            } else if (isPendingSelfMark) {
-              cellStyle = isLight
-                ? 'border-blue-400 bg-blue-50 text-blue-900 shadow-sm ring-1 ring-blue-300'
-                : 'border-cyan/70 bg-cyan/15 text-cyan ring-1 ring-cyan/40'
-            } else if (isRevealedUnclicked) {
-              cellStyle = isLight
-                ? 'border-amber-400 bg-amber-50 text-amber-900 animate-pulse ring-2 ring-amber-400'
-                : 'border-amber/80 bg-amber/20 text-amber animate-pulse ring-2 ring-amber'
+                ? 'border-emerald-500 bg-emerald-100 text-emerald-950 font-bold shadow-sm ring-2 ring-emerald-400/50 cursor-pointer'
+                : 'border-lime/90 bg-lime/25 text-lime font-bold ring-2 ring-lime/40 cursor-pointer'
             } else {
-              // Default waiting state - screenshot style: light gray cards with crisp dark text
+              // Unselected waiting cell - matches user's reference image
               cellStyle = isLight
                 ? 'border-[#ced4da] bg-[#e9ecef] hover:bg-[#dee2e6] text-slate-800 hover:border-slate-400 shadow-[0_1px_2px_rgba(0,0,0,0.04)] cursor-pointer'
                 : 'border-edge bg-panel hover:bg-panel/90 text-slate-200 hover:border-cyan/50 cursor-pointer'
@@ -127,6 +108,7 @@ export function Ticket({
                 key={`${r}-${c}`}
                 role={onToggleCell ? 'button' : undefined}
                 tabIndex={onToggleCell && !isCut ? 0 : undefined}
+                aria-pressed={isSelected}
                 onClick={() => {
                   if (!isCut && onToggleCell) {
                     onToggleCell(cell)
@@ -142,7 +124,7 @@ export function Ticket({
                   'cell group relative overflow-hidden transition-all duration-150',
                   cellStyle,
                   isLatest ? 'animate-pop ring-2 ring-cyan' : '',
-                  onToggleCell && !isCut ? 'active:scale-95 cursor-pointer' : '',
+                  onToggleCell && !isCut ? 'active:scale-95 cursor-pointer select-none' : '',
                 ].join(' ')}
                 title={`#${cell} [${item.category}]: ${item.term} — ${item.clue}`}
               >
@@ -167,38 +149,14 @@ export function Ticket({
                   </span>
                 )}
 
-                {/* Confirmed mark badge */}
-                {isConfirmed && (
+                {/* User Selected Checkmark badge */}
+                {isSelected && (
                   <span
-                    className={`absolute bottom-0.5 right-1 text-[9px] font-bold ${
+                    className={`absolute bottom-0.5 right-1 text-[10px] font-black ${
                       isLight ? 'text-emerald-700' : 'text-lime'
                     }`}
                   >
                     ✓
-                  </span>
-                )}
-
-                {/* Self marked (pending admin reveal) */}
-                {isPendingSelfMark && (
-                  <span
-                    className={`absolute bottom-0.5 right-1 text-[8px] font-bold ${
-                      isLight ? 'text-blue-700' : 'text-cyan'
-                    }`}
-                    title="Marked by you (waiting for admin to reveal answer)"
-                  >
-                    ★
-                  </span>
-                )}
-
-                {/* Revealed by admin but player hasn't clicked */}
-                {isRevealedUnclicked && (
-                  <span
-                    className={`absolute bottom-0.5 right-1 text-[8px] font-bold ${
-                      isLight ? 'text-amber-700' : 'text-amber'
-                    }`}
-                    title="Answer revealed! Click to daub!"
-                  >
-                    ●
                   </span>
                 )}
               </div>
@@ -211,27 +169,21 @@ export function Ticket({
       <div className={`mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-2.5 text-[11px] ${
         isLight ? 'border-slate-200 text-slate-600' : 'border-edge text-slate-400'
       }`}>
-        <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1">
-          <span className="flex items-center gap-1.5">
-            <span className={`inline-block h-2.5 w-2.5 rounded-sm border ${
-              isLight ? 'border-emerald-400 bg-emerald-100' : 'border-lime/70 bg-lime/20'
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className={`inline-block h-3 w-3 rounded-sm border ${
+              isLight ? 'border-emerald-500 bg-emerald-200' : 'border-lime/90 bg-lime/30'
             }`} />
-            Confirmed ✓
+            Selected ✓ (click again to unselect)
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className={`inline-block h-2.5 w-2.5 rounded-sm border ${
-              isLight ? 'border-blue-400 bg-blue-100' : 'border-cyan/70 bg-cyan/20'
-            }`} />
-            Marked by you ★
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className={`inline-block h-2.5 w-2.5 rounded-sm border ${
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className={`inline-block h-3 w-3 rounded-sm border ${
               isLight ? 'border-[#ced4da] bg-[#e9ecef]' : 'border-edge bg-panel'
             }`} />
-            Unmarked
+            Unselected
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className={`inline-block h-2.5 w-2.5 rounded-sm border ${
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className={`inline-block h-3 w-3 rounded-sm border ${
               isLight ? 'border-red-300 bg-red-100' : 'border-rose/60 bg-rose/20'
             }`} />
             Cut ✂
@@ -239,8 +191,8 @@ export function Ticket({
         </div>
 
         {onToggleCell && (
-          <p className="text-[10px] italic opacity-80">
-            💡 Tap any cell on your ticket to mark your answer!
+          <p className="text-[11px] font-semibold text-cyan">
+            💡 Use your knowledge: tap a cell to select it, or tap again to unselect!
           </p>
         )}
       </div>
