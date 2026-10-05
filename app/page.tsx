@@ -7,6 +7,8 @@ import { createGame, joinGame, sessions } from '@/lib/api'
 import { isConfigured } from '@/lib/insforge'
 import { primeAudio } from '@/lib/sound'
 
+import { ThemeToggle } from '@/lib/theme'
+
 export default function Landing() {
   const router = useRouter()
   const [hostName, setHostName] = useState('')
@@ -72,15 +74,17 @@ export default function Landing() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:py-16">
+    <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:py-14">
+      <div className="flex justify-end">
+        <ThemeToggle />
+      </div>
       <header className="text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.4em] text-cyan">ACM Engineering Day</p>
         <h1 className="mt-3 text-4xl font-black leading-none sm:text-6xl">
           Technical <span className="text-cyan">Tambola</span>
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-sm text-slate-400 sm:text-base">
-          Classic 90-ball tambola, except every number is announced as a tech clue. Decode it, find it on your ticket,
-          and shout your claim before anyone else does.
+          Multiplayer technical tambola with terms, code execution outputs, and computer science clues instead of raw numbers.
         </p>
       </header>
 

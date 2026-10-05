@@ -6,22 +6,37 @@
   color-scheme: dark;
 }
 
+html.light {
+  color-scheme: light;
+}
+
 html,
 body {
   height: 100%;
 }
 
 body {
-  @apply bg-ink text-slate-100 antialiased;
+  @apply bg-ink text-slate-100 antialiased transition-colors duration-200;
   background-image:
     radial-gradient(circle at 20% -10%, rgba(34, 211, 238, 0.12), transparent 45%),
     radial-gradient(circle at 85% 0%, rgba(163, 230, 53, 0.1), transparent 40%);
   background-attachment: fixed;
 }
 
+html.light body {
+  @apply bg-[#f4f6f9] text-slate-800;
+  background-image:
+    radial-gradient(circle at 20% -10%, rgba(14, 165, 233, 0.08), transparent 45%),
+    radial-gradient(circle at 85% 0%, rgba(16, 185, 129, 0.08), transparent 40%);
+}
+
 @layer components {
   .card {
-    @apply rounded-2xl border border-edge bg-panel/80 backdrop-blur;
+    @apply rounded-2xl border border-edge bg-panel/80 backdrop-blur transition-colors;
+  }
+
+  html.light .card {
+    @apply border-slate-200 bg-white/95 shadow-sm text-slate-800;
   }
 
   .btn {
@@ -32,12 +47,24 @@ body {
            disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-edge disabled:hover:text-slate-200;
   }
 
+  html.light .btn {
+    @apply border-slate-300 bg-white text-slate-700 hover:border-cyan/70 hover:bg-slate-50 hover:text-slate-900 shadow-sm;
+  }
+
   .btn-primary {
     @apply border-cyan/70 bg-cyan/15 text-cyan hover:bg-cyan/25;
   }
 
+  html.light .btn-primary {
+    @apply border-cyan/80 bg-cyan/15 text-cyan hover:bg-cyan/25;
+  }
+
   .btn-danger {
     @apply border-rose/70 bg-rose/15 text-rose hover:bg-rose/25;
+  }
+
+  html.light .btn-danger {
+    @apply border-rose/80 bg-rose/15 text-rose hover:bg-rose/25;
   }
 
   .field {
@@ -45,15 +72,24 @@ body {
            placeholder:text-slate-500 focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan;
   }
 
+  html.light .field {
+    @apply border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-cyan;
+  }
+
   .label {
     @apply mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-400;
   }
-}
 
-/* A ticket cell that is numbered, called and not cut. */
-@layer utilities {
-  .cell {
-    @apply relative flex aspect-square items-center justify-center rounded-md border text-xs font-bold
-           tabular-nums transition-colors sm:rounded-lg sm:text-sm;
+  html.light .label {
+    @apply text-slate-500;
   }
 }
+
+/* A ticket cell that can display technical terms, outputs, or numbers */
+@layer utilities {
+  .cell {
+    @apply relative flex min-h-[58px] sm:min-h-[72px] md:min-h-[78px] items-center justify-center rounded-md border text-[11px] sm:text-xs font-bold
+           text-center leading-tight transition-all sm:rounded-lg p-1 select-none;
+  }
+}
+

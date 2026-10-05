@@ -57,6 +57,8 @@ export interface Settings {
   reveal_seconds?: number
   pause_after_calls?: number
   closing_seq?: number
+  revealed_seqs?: number[]
+  custom_bank?: unknown
 }
 
 export interface GameState {

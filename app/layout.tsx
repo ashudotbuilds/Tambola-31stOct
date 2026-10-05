@@ -13,10 +13,15 @@ export const viewport: Viewport = {
   maximumScale: 1,
 }
 
+import { ThemeProvider } from '@/lib/theme'
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   )
 }
+

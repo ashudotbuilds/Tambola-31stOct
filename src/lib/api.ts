@@ -179,3 +179,32 @@ export async function submitClaim(
     }
   }
 }
+
+export async function revealCalls(
+  gameId: string,
+  hostToken: string,
+  seqs: number[],
+): Promise<{ ok: boolean; revealed_seqs: number[] }> {
+  return requireOk(
+    await rpc<{ ok: boolean; revealed_seqs: number[] }>('reveal_calls', {
+      p_game_id: gameId,
+      p_host_token: hostToken,
+      p_seqs: seqs,
+    }),
+  )
+}
+
+export async function updateGameBank(
+  gameId: string,
+  hostToken: string,
+  customBank: unknown,
+): Promise<{ ok: boolean }> {
+  return requireOk(
+    await rpc<{ ok: boolean }>('update_game_bank', {
+      p_game_id: gameId,
+      p_host_token: hostToken,
+      p_custom_bank: customBank,
+    }),
+  )
+}
+
