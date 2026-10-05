@@ -88,8 +88,18 @@ html.light body {
 /* A ticket cell that can display technical terms, outputs, or numbers */
 @layer utilities {
   .cell {
-    @apply relative flex min-h-[58px] sm:min-h-[72px] md:min-h-[78px] items-center justify-center rounded-md border text-[11px] sm:text-xs font-bold
-           text-center leading-tight transition-all sm:rounded-lg p-1 select-none;
+    @apply relative flex min-h-[58px] sm:min-h-[72px] md:min-h-[78px] items-center justify-center rounded-md border text-[10px] sm:text-xs font-bold
+           text-center leading-tight transition-all sm:rounded-lg p-1 select-none active:scale-95;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
 

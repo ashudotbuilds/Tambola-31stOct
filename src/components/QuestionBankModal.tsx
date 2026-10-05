@@ -81,7 +81,7 @@ export function QuestionBankModal({ isOpen, onClose, currentBank, onSaveBank }: 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div
-        className={`card flex flex-col max-h-[90vh] w-full max-w-4xl overflow-hidden p-6 shadow-2xl ${
+        className={`card flex flex-col max-h-[92vh] w-full max-w-4xl overflow-hidden p-3.5 sm:p-6 shadow-2xl ${
           isLight ? 'bg-white border-slate-200' : 'bg-panel border-edge'
         }`}
       >
