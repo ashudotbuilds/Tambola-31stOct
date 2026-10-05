@@ -198,7 +198,7 @@ export function Ticket({
                     isLatest ? 'animate-pop ring-2 ring-cyan' : '',
                     onToggleCell && !isCut ? 'cursor-pointer active:scale-95' : '',
                   ].join(' ')}
-                  title={`#${cell} [${item.category}]: ${item.term} — ${item.clue}`}
+                  title={`#${cell} [${item.category}]: ${item.term}`}
                 >
                   {/* Item ID badge */}
                   <span
@@ -271,9 +271,6 @@ export function Ticket({
               {playerMarked.has(inspectedItem.id) ? 'Selected ✓' : 'Unselected'}
             </span>
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-tight">
-            {inspectedItem.clue}
-          </p>
         </div>
       )}
 

@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { CodeChip, ConnectionDot, StatusPill } from '@/components/Chrome'
 import { ClaimButtons } from '@/components/ClaimButtons'
 import { Leaderboard } from '@/components/Leaderboard'
-import { NumberBoard } from '@/components/NumberBoard'
 import { Ticket } from '@/components/Ticket'
 import { LobbyTutorialSimulator } from '@/components/LobbyTutorialSimulator'
 import { sessions, setPlayerMarks, submitClaim } from '@/lib/api'
@@ -372,7 +371,7 @@ export default function PlayerScreen() {
         ticket={me?.ticket ?? null}
         playerMarked={playerMarked}
         cut={cut}
-        latest={call?.number ?? null}
+        latest={isCallRevealed ? call?.number ?? null : null}
         customBank={customBank}
         onToggleCell={handleToggleCell}
         showNumbersOnly={showNumbersOnly}
@@ -396,16 +395,6 @@ export default function PlayerScreen() {
           onClaim={onClaim}
         />
       )}
-
-      {/* Called Numbers Board */}
-      <details className="card p-3 sm:p-4">
-        <summary className="cursor-pointer text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300">
-          All 90 Technical Items Board
-        </summary>
-        <div className="mt-3">
-          <NumberBoard called={room.calledNumbers} latest={call?.number ?? null} compact />
-        </div>
-      </details>
 
       {/* Standings */}
       <section className="card p-3 sm:p-4">
