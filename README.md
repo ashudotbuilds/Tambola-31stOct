@@ -168,3 +168,8 @@ symptom explained in the header comment, because the failure modes here are not
 obvious: Postgres's `jsonb ||` concatenates arrays instead of nesting them,
 `array_remove()` strips every duplicate at once, and `ARRAY(SELECT ...)` returns
 an empty array rather than NULL when nothing matches.
+
+---
+
+Built by Ashutosh with love
+
