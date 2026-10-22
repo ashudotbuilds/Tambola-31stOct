@@ -1,34 +1,27 @@
 {
-  "name": "acm-engday-tambola",
+  "name": "technical-tambola",
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": { "node": ">=22.12.0" },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "typecheck": "tsc --noEmit",
-    "test:smoke": "node scripts/smoke.mjs",
-    "test:parity": "node --experimental-strip-types scripts/claims-parity.ts",
-    "test": "npm run typecheck && npm run test:parity && npm run test:smoke",
-    "db:migrate": "npx -y @insforge/cli db migrations up --all",
-    "db:status": "npx -y @insforge/cli db migrations list"
-  },
-  "dependencies": {
-    "@insforge/sdk": "^1.5.2",
-    "next": "^15.1.6",
-    "qrcode": "^1.5.4",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "dev": "concurrently -k -n api,web \"npm run dev -w @tambola/api\" \"npm run dev -w @tambola/web\"",
+    "dev:web": "npm run dev -w @tambola/web",
+    "dev:api": "npm run dev -w @tambola/api",
+    "build": "npm run build:api && npm run build:web",
+    "build:web": "npm run build -w @tambola/web",
+    "build:api": "npm run build -w @tambola/api",
+    "start": "npm run start -w @tambola/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w @tambola/api",
+    "db:migrate": "npm run db:migrate -w @tambola/api",
+    "db:migrate:prod": "npm run db:migrate:prod -w @tambola/api",
+    "db:status": "npm run db:status -w @tambola/api"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",
-    "@types/qrcode": "^1.5.5",
-    "@types/react": "^19.0.7",
-    "@types/react-dom": "^19.0.3",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.17",
+    "concurrently": "^9.1.2",
     "typescript": "^5.7.3"
   }
 }

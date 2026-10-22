@@ -7,6 +7,12 @@ dist/
 .env
 .env.local
 .env*.local
+apps/*/.env
+apps/*/.env.*
+!apps/*/.env.example
+.playwright/
+test-results/
+coverage/
 
 .insforge/
 
@@ -17,6 +23,7 @@ next-env.d.ts
 npm-debug.log*
 yarn-error.log*
 .vercel
+.neon
 
 # InsForge & AI agent skills
 .insforge

@@ -1,175 +1,282 @@
 # Technical Tambola
 
-Multiplayer tambola for a room of about fifty people, where every number is
-announced as a tech clue.
+A multiplayer technical tambola game for ACM Engineering Day. Players solve
+computer science clues and code questions, then manually mark the matching terms
+on their tickets. A host controls the game while a projector shows the live round.
 
-> **The clue:** "404 — Not Found" → the host counts down → the number **4** is
-> revealed and stamped on every ticket that carries it.
+This is the React/Vite and Express/TypeScript rebuild of the original application.
+The existing screens, themes, ticket interactions, question bank editor, lobby
+simulator, sound cues, and game flow are retained.
 
-Classic 90-ball tambola rules, so it plays like the real thing. The twist is that
-the host never says a number: they read a clue, everyone decodes it, and the
-reveal decides whether anyone should be shouting.
-
----
-
-## The game
-
-A standard 3×9 ticket: 15 numbers, 5 per row, 4 blanks per row, and 1–3 numbers
-in each of the nine columns (1–9, 10–19, … 80–90). All four corner cells are
-always numbered, so Four Corners is always winnable.
-
-| Claim | Points | Who can win it |
+| Layer | Technology | Hosting |
 | --- | --- | --- |
-| Early Five | 10 | first only |
-| Four Corners | 20 | first only |
-| Top / Middle / Bottom Line | 30 each | first only |
-| Full House | 50 | first only |
-| Second Full House | 30 | first only |
+| Frontend | React 19, Vite, TypeScript, React Router, Tailwind CSS | Vercel |
+| Backend | Express 5, TypeScript, Socket.IO | Render |
+| Database | PostgreSQL via `pg`, versioned SQL migrations | Neon |
+| Shared code | Types, claim rules, default technical question bank | npm workspace |
 
-- Numbers are **auto-daubed** the instant they are called, so nobody loses a
-  claim to a laggy phone. Decoding the clue is the only test.
-- A **wrong claim costs 10 points and cuts one of your marked numbers** — that
-  cell can no longer count toward a full house.
-- The first Full House puts the game into *closing*. It ends at the second Full
-  House, or 10 calls later, whichever comes first.
+The rebuild uses a **fresh database**. The dedicated Neon project and its schema
+are configured; Vercel and Render deployment are handled manually. See
+[the current deployment setup](docs/DEPLOYMENT.md#current-setup) for details.
+InsForge is no longer an application dependency.
 
-### Clues
+## Quick start
 
-Every number from 1 to 90 has two hand-written variants in
-`migrations/*_clue-bank.sql`, so a repeat call never sounds the same. The host
-reveals a clue, gives a few seconds, then reveals the number, which also removes
-any ambiguity in the clue itself.
+Use Node.js 22.12+ and npm. Node 22 LTS is used by the deployment configuration.
+Run all commands below from the repository root.
 
-```
- 8   →  8 bits make a byte          56  →  56k, the dial-up modem speed
-42   →  The Answer to Life...       64  →  64-bit architecture
-80   →  80 columns, 80×24 terminal  90  →  the upper bound of a tambola ticket
+```sh
+npm ci
 ```
 
----
+Create the frontend and backend environment files:
 
-## Screens
+```powershell
+# PowerShell
+Copy-Item apps/web/.env.example apps/web/.env.local
+Copy-Item apps/api/.env.example apps/api/.env
+```
 
-| Route | Who | What it does |
+```sh
+# macOS / Linux
+cp apps/web/.env.example apps/web/.env.local
+cp apps/api/.env.example apps/api/.env
+```
+
+Set `DATABASE_URL` in `apps/api/.env` to your Neon PostgreSQL connection string.
+Keep the SSL query parameters supplied by Neon. Optionally set
+`MIGRATION_DATABASE_URL` to the direct endpoint for migrations.
+
+```sh
+npm run db:migrate
+npm run dev
+```
+
+Open [the frontend](http://localhost:5173). The API listens on port 3001.
+`GET /health` checks the process; `GET /ready` checks database/schema access.
+
+For a local PostgreSQL database instead of Neon:
+
+```sh
+docker compose up -d postgres
+```
+
+Then use this development-only backend connection string and run the migrations:
+
+```dotenv
+DATABASE_URL=postgresql://tambola:local-development-only@localhost:5432/tambola
+```
+
+### Environment variables
+
+The frontend reads `apps/web/.env.local`. Vite embeds these values when it builds.
+
+| Variable | Local value | Production value |
 | --- | --- | --- |
-| `/` | everyone | create a game, or join with a code |
-| `/host` | the host | lobby with QR code, clue stage, call button (space bar), claim feed, standings, pause/end, results |
-| `/play` | players | ticket, claim buttons, score and rank, standings, toasts |
-| `/board?code=XXXXXX` | projector | big clue and number, called board, standings. No token, shareable |
+| `VITE_API_URL` | `http://localhost:3001` | Your Render API origin, without `/api` |
 
-The host is a moderator and does not play. Pressing **space** calls the next
-number, so the host never has to look at the mouse.
+The backend reads `apps/api/.env`, or environment variables supplied by the host.
 
----
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `DATABASE_URL` | Application PostgreSQL connection string | Required |
+| `MIGRATION_DATABASE_URL` | Optional migration connection string | Uses `DATABASE_URL` |
+| `WEB_ORIGINS` | Comma-separated exact allowed frontend origins | `http://localhost:5173` |
+| `PORT` | HTTP and Socket.IO port | `3001` |
+| `HOST` | Network bind address | `0.0.0.0` |
+| `DATABASE_POOL_MAX` | Maximum application database connections | `10` |
+| `TRUST_PROXY_HOPS` | Trusted reverse proxy hops | `0` locally; `1` on Render |
+| `NODE_ENV` | Runtime environment | `development` |
 
-## How fairness works
+Never put database credentials in a `VITE_` variable. No database credentials or
+service keys are needed by the browser. Environment files are ignored by Git.
 
-There are no accounts. Identity is a random secret token handed out by
-`create_game` / `join_game`, and all the rules live in Postgres.
+## Project structure
 
-- The `anon` role has **no privileges on any game table**. Every read and write
-  goes through a `SECURITY DEFINER` function that checks a token.
-- Only `draw_number()` can produce a number, and only the host's token can call
-  it. No client can invent a call.
-- Only `submit_claim()` can award points. It re-checks the claim against the
-  stored ticket, so a client cannot claim a line it never completed.
-- Marks are written by the server at draw time. A client cannot mark, or unmark,
-  its own ticket.
-- Realtime events are published by **database triggers**. Clients hold no
-  publish privilege, so a player cannot forge a `number_called` or `claim_result`.
-  Row level security on `realtime.messages` has no write policy, which is what
-  actually enforces this.
-- Simultaneous claims are settled by a partial unique index on
-  `claims(game_id, claim_type) WHERE status = 'accepted'`, so exactly one player
-  can win a given claim. The loser is told they were beaten and pays nothing.
+```text
+apps/
+  web/
+    index.html                    Browser entry and metadata
+    vite.config.ts                Vite configuration and source alias
+    src/
+      main.tsx                    Router and theme providers
+      App.tsx                     The four application routes
+      pages/                      Landing, host, player, projector screens
+      features/
+        host/Results.tsx          Final standings and call history
+        board/ProjectorCallStage.tsx
+      components/                 Tickets, clue stage, claims, question editor, tutorial
+      hooks/
+        useGameRoom.ts            Socket lifecycle, refresh, reconnect and room state
+        usePlayerMarks.ts         Instant manual selection and server restoration
+      lib/
+        api.ts                    Typed API operations and ordered mark saves
+        http.ts                   Fetch, timeout, and error handling
+        sessions.ts               Local host/player session persistence
+        technicalBank.ts          Import/export and browser bank preferences
+        theme.tsx                 Light/dark theme
+        sound.ts                  Sound and speech helpers
+      styles/globals.css          Original visual styles
+  api/
+    src/
+      index.ts                    Process startup and graceful shutdown
+      app.ts                      Express, CORS, limits, health, Socket.IO
+      config.ts                   Environment loading and validation
+      errors.ts                   Application errors
+      db/                         pg adapter and migration runner
+      modules/games/
+        routes.ts                 REST handlers and bearer sessions
+        validation.ts             Request schemas
+        service.ts                Game lifecycle, draws, banks, marks and state
+        claims.ts                 Claim judgment, scoring and penalties
+        repository.ts             Game/player/ticket access and token helpers
+        ticket.ts                 Standard 90-ball ticket generation
+        models.ts                 Internal database row types
+      realtime/rooms.ts           Room admission and device presence
+    migrations/001_initial.sql    Portable PostgreSQL schema
+    test/                         Game, HTTP, socket and ticket verification
+packages/shared/src/
+  types.ts                        Shared data contracts
+  claims.ts                       Claim metadata and eligibility rules
+  bank.ts                         Original 90 technical items
 
-Read more about the access model in `migrations/*_assert-realtime-access.sql`.
-
----
-
-## Running it
-
-```bash
-npm install
-
-# keys come from the linked InsForge project
-cp .env.example .env.local     # or use the values already in .env.local
-
-npm run db:migrate             # apply migrations
-npm run dev                    # http://localhost:3000
+docs/DEPLOYMENT.md                 Vercel, Render, Neon and future AWS setup
+docs/API.md                        REST and socket reference
+docs/legacy/                       Historical InsForge SQL/scripts; not executable setup
+render.yaml                       Render Blueprint
+vercel.json                       Vercel SPA deployment settings
+Dockerfile                        Backend container for Render/AWS
+compose.yaml                      Optional local PostgreSQL
 ```
 
-### Tests
+## Screens and game flow
 
-```bash
-npm test              # typecheck + parity + smoke, in that order
-npm run typecheck
-npm run test:parity   # client claim logic vs the SQL rules
-npm run test:smoke    # real backend: lobby, draw, claim, realtime, security
+| Route | Audience | Features |
+| --- | --- | --- |
+| `/` | Everyone | Create/join, six-character code, QR join link, resume session |
+| `/host` | Host | Lobby, QR code, custom bank, start, call, individual/batch reveal, pause/resume/end, claim feed, standings and results |
+| `/play` | Player | Lobby tutorial, technical ticket, manual marking/unmarking, claim buttons, score/rank, live clues and toasts |
+| `/board?code=ABC123` | Projector | Public live question, reveal, called grid/terms, standings and recent claims |
+
+The host moderates and receives no ticket. Space calls the next question, except
+while typing or editing the question bank. Light/dark themes and sound controls
+are retained. The host can read clues aloud through browser speech synthesis.
+
+### Browser preview
+
+![Host console](docs/screenshots/host.png)
+
+[Player ticket](docs/screenshots/player.png) · [Projector screen](docs/screenshots/projector.png)
+
+Each ticket has three rows and nine columns, with 15 distinct numbers, five per
+row, and one to three per column. Bands are 1-9, 10-19, ..., 80-90. All four corner
+cells are filled. The cells display technical terms by default; players can
+switch to numbers.
+
+**Marking is manual.** Calling or revealing a question never selects a player's
+cells. Claims are checked against saved marks intersected with officially called
+numbers, excluding cells cut by penalties. Extra uncalled marks never count.
+
+| Claim | Points | Availability |
+| --- | --- | --- |
+| Early Five | 10 | One winner per game |
+| Four Corners | 20 | One winner per game |
+| Top / Middle / Bottom Line | 30 each | One winner per line |
+| Full House | 50 | One winner; starts closing |
+| Second Full House | 30 | Available after Full House; ends game |
+
+A wrong claim deducts 10 points, with a floor of zero, and cuts one selected
+number if available. Losing a valid claim race causes no penalty. Closing ends
+at Second Full House or ten additional calls. Pause/resume remembers whether the
+game was playing or closing. The default capacity is 100 people including the host.
+
+Hosts can search, import, edit, reset, and export the 90-item question bank.
+Imports accept JSON or delimited lines such as `Term | Clue`; short imports fill
+remaining entries from the default bank. Bank changes are persisted on the game
+and shared with players and the projector.
+
+## State, sessions, and fairness
+
+The browser talks only to Express over HTTP and Socket.IO. Express connects to
+PostgreSQL; clients have no direct database access.
+
+```mermaid
+flowchart LR
+  W[React / Vite on Vercel] -->|REST requests| A[Express / TypeScript on Render]
+  A -->|Socket.IO invalidations + presence| W
+  A -->|Parameterized SQL + transactions| D[(Neon PostgreSQL)]
 ```
 
-Two of these are worth knowing about:
+There are no player accounts. Creating/joining issues a random bearer token;
+hosts also receive a separate host token. Only SHA-256 token hashes are stored in
+the database. Raw sessions are stored in the browser under `tt.v2.host` and
+`tt.v2.player`. Clearing browser storage loses that device's session.
 
-- **The migrations test themselves.** `verify-game-rules` and `verify-game-flow`
-  are migrations whose only job is to assert the game's rules and then fail the
-  migration if an assertion breaks. They run hundreds of generated tickets
-  through the real generator, drive four complete games through the public RPCs,
-  and check that no table is reachable by `anon`.
-- **`test:parity` compares the two implementations of the rules.** The claim
-  buttons in the UI are gated by `isClaimEligible()` in `src/lib/claims.ts`, a
-  mirror of the SQL function `tambola_claim_ok()`. `claim_parity_fixture()`
-  returns random tickets with the server's verdict; the test recomputes each
-  verdict in TypeScript and compares. This caught a bug where blank cells were
-  treated as failures, which would have made **no line claim ever light up**,
-  because every row has four blanks.
+Game mutations use transactions. Draws and claims lock the game row, while mark
+saves lock the player's own ticket. Database uniqueness constraints prevent
+repeated numbers and multiple accepted winners for a claim. Rapid mark saves are
+sent in order, and submitting a claim waits for the latest selection to be saved.
 
----
+Socket.IO publishes a `game_changed` invalidation **after commit**. Clients then
+fetch state using their own token. Private tickets and tokens are never room
+broadcasts. The hook refreshes after joining/reconnecting, on page visibility,
+and every 15 seconds to recover missed changes. Game data survives API restarts;
+device presence is transient.
 
-## Deploying
+The projector is intentionally public to anyone with the game code. As in the
+original game, public state includes the called numbers and the question bank;
+visual answer hiding is a game presentation feature, not secrecy from a client
+inspecting network responses.
 
-```bash
-npm run build
-npx -y @insforge/cli deployments deploy .
+## Commands and verification
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start API and frontend together |
+| `npm run dev:web` / `npm run dev:api` | Start one application |
+| `npm run typecheck` | Check all workspaces |
+| `npm test` | Run isolated PostgreSQL/WASM, HTTP, Socket.IO and ticket tests |
+| `npm run build` | Build both production applications |
+| `npm run build:web` / `npm run build:api` | Build one application |
+| `npm start` | Start the compiled API |
+| `npm run db:migrate` | Apply pending schema migrations |
+| `npm run db:status` | Show migration state |
+| `npm run db:migrate:prod` | Run the compiled migration runner after API build |
+
+The tests use PGlite, a real PostgreSQL engine compiled to WebAssembly, in an
+isolated database. They require no Neon account and cover 1,000 generated tickets,
+manual/official mark rules, authorization, private state, duplicate names,
+concurrent claim requests, penalties, closing, all 90 draws, room isolation,
+presence, and reconnection. Neon connectivity, Render/Vercel deployment, and
+multi-process load still need validation after cloud configuration.
+
+For a disposable browser test environment without a database connection:
+
+```sh
+# Terminal 1: test API; all data disappears when this process exits
+npm exec -w @tambola/api -- tsx test/browser-server.ts
+# Terminal 2
+npm run dev:web
 ```
 
-Set `NEXT_PUBLIC_INSFORGE_URL` and `NEXT_PUBLIC_INSFORGE_ANON_KEY` in the
-deployment environment. Put the URL on the projector; players scan the QR code
-and play from their own phones.
+Use this only for development verification. The normal API requires PostgreSQL.
 
----
+Production dependencies have a separate audit: `npm audit --omit=dev`. The retained
+Tailwind 3 build tooling has upstream development dependency advisories; review
+`npm audit` before upgrading the styling pipeline, since Tailwind 4 changes CSS behavior.
 
-## Layout
+## Deployment and AWS portability
 
-```
-app/                     Next.js App Router screens
-  page.tsx               landing: create or join
-  host/page.tsx          host console
-  play/page.tsx          player ticket
-  board/page.tsx         projector view
-src/lib/
-  insforge.ts            SDK client
-  api.ts                 RPC wrappers and localStorage sessions
-  claims.ts              claim metadata + the client mirror of the SQL rules
-  sound.ts               generated sound cues, no audio assets
-  types.ts               shared shapes
-src/hooks/useGameRoom.ts realtime subscription and game state
-src/components/          ticket, called board, claim buttons, clue stage, …
-migrations/              SQL, applied in filename order
-scripts/
-  smoke.mjs              end-to-end test against the real backend
-  claims-parity.ts       client rules vs server rules
-```
+See [Deployment](docs/DEPLOYMENT.md) for exact settings and the first deployment
+order. See [API reference](docs/API.md) for endpoints and authentication.
 
-### Migrations
+The backend uses a normal Node HTTP server and portable PostgreSQL. A Dockerfile
+is included for the later move to AWS. The natural targets are S3/CloudFront for
+the static frontend, ECS/Fargate behind an ALB for the API, and RDS PostgreSQL.
+The current socket adapter and rate limit store assume **one API instance**;
+multiple replicas require shared socket presence/event delivery and shared limits.
 
-They run in filename order and each one is applied once, so the history is the
-record of what changed and why. Several of them are bug fixes with the original
-symptom explained in the header comment, because the failure modes here are not
-obvious: Postgres's `jsonb ||` concatenates arrays instead of nesting them,
-`array_remove()` strips every duplicate at once, and `ARRAY(SELECT ...)` returns
-an empty array rather than NULL when nothing matches.
+Historical InsForge migrations and diagnostics live under `docs/legacy` as a
+reference. Only `apps/api/migrations` is applied to the new database.
 
----
-
-Built by Ashutosh with love
-
+Built by Ashutosh with love.

@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: technical-tambola-api
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --include=dev && npm run build:api
+    preDeployCommand: npm run db:migrate:prod
+    startCommand: npm start
+    healthCheckPath: /ready
+    numInstances: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: TRUST_PROXY_HOPS
+        value: 1
+      - key: DATABASE_POOL_MAX
+        value: 10
+      - key: DATABASE_URL
+        sync: false
+      - key: MIGRATION_DATABASE_URL
+        sync: false
+      - key: WEB_ORIGINS
+        sync: false
