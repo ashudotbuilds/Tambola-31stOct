@@ -3,25 +3,27 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "workspaces": ["apps/*", "packages/*"],
-  "engines": { "node": ">=22.12.0" },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
-    "dev": "concurrently -k -n api,web \"npm run dev -w @tambola/api\" \"npm run dev -w @tambola/web\"",
-    "dev:web": "npm run dev -w @tambola/web",
-    "dev:api": "npm run dev -w @tambola/api",
-    "build": "npm run build:api && npm run build:web",
-    "build:web": "npm run build -w @tambola/web",
-    "build:api": "npm run build -w @tambola/api",
-    "start": "npm run start -w @tambola/api",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test -w @tambola/api",
-    "db:migrate": "npm run db:migrate -w @tambola/api",
-    "db:migrate:prod": "npm run db:migrate:prod -w @tambola/api",
-    "db:status": "npm run db:status -w @tambola/api"
+    "setup": "npm ci --prefix frontend && npm ci --prefix backend",
+    "dev": "concurrently -k -n backend,frontend \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "dev:web": "npm --prefix frontend run dev",
+    "dev:api": "npm --prefix backend run dev",
+    "build": "npm run check:shared && npm run build:api && npm run build:web",
+    "build:web": "npm --prefix frontend run build",
+    "build:api": "npm --prefix backend run build",
+    "start": "npm --prefix backend start",
+    "typecheck": "npm --prefix backend run typecheck && npm --prefix frontend run typecheck",
+    "test": "npm run check:shared && npm --prefix backend test",
+    "sync:shared": "node scripts/sync-shared.mjs",
+    "check:shared": "node scripts/sync-shared.mjs --check",
+    "db:migrate": "npm --prefix backend run db:migrate",
+    "db:migrate:prod": "npm --prefix backend run db:migrate:prod",
+    "db:status": "npm --prefix backend run db:status"
   },
   "devDependencies": {
-    "@types/node": "^22.10.7",
-    "concurrently": "^9.1.2",
-    "typescript": "^5.7.3"
+    "concurrently": "^9.1.2"
   }
 }

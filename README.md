@@ -13,7 +13,7 @@ simulator, sound cues, and game flow are retained.
 | Frontend | React 19, Vite, TypeScript, React Router, Tailwind CSS | Vercel |
 | Backend | Express 5, TypeScript, Socket.IO | Render |
 | Database | PostgreSQL via `pg`, versioned SQL migrations | Neon |
-| Shared code | Types, claim rules, default technical question bank | npm workspace |
+| Common contracts | Types, claim rules, question bank copied into each app | No cross-folder dependency |
 
 The rebuild uses a **fresh database**. The dedicated Neon project and its schema
 are configured; Vercel and Render deployment are handled manually. See
@@ -27,23 +27,24 @@ Run all commands below from the repository root.
 
 ```sh
 npm ci
+npm run setup
 ```
 
 Create the frontend and backend environment files:
 
 ```powershell
 # PowerShell
-Copy-Item apps/web/.env.example apps/web/.env.local
-Copy-Item apps/api/.env.example apps/api/.env
+Copy-Item frontend/.env.example frontend/.env.local
+Copy-Item backend/.env.example backend/.env
 ```
 
 ```sh
 # macOS / Linux
-cp apps/web/.env.example apps/web/.env.local
-cp apps/api/.env.example apps/api/.env
+cp frontend/.env.example frontend/.env.local
+cp backend/.env.example backend/.env
 ```
 
-Set `DATABASE_URL` in `apps/api/.env` to your Neon PostgreSQL connection string.
+Set `DATABASE_URL` in `backend/.env` to your Neon PostgreSQL connection string.
 Keep the SSL query parameters supplied by Neon. Optionally set
 `MIGRATION_DATABASE_URL` to the direct endpoint for migrations.
 
@@ -69,13 +70,13 @@ DATABASE_URL=postgresql://tambola:local-development-only@localhost:5432/tambola
 
 ### Environment variables
 
-The frontend reads `apps/web/.env.local`. Vite embeds these values when it builds.
+The frontend reads `frontend/.env.local`. Vite embeds these values when it builds.
 
 | Variable | Local value | Production value |
 | --- | --- | --- |
 | `VITE_API_URL` | `http://localhost:3001` | Your Render API origin, without `/api` |
 
-The backend reads `apps/api/.env`, or environment variables supplied by the host.
+The backend reads `backend/.env`, or environment variables supplied by the host.
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
@@ -94,60 +95,50 @@ service keys are needed by the browser. Environment files are ignored by Git.
 ## Project structure
 
 ```text
-apps/
-  web/
-    index.html                    Browser entry and metadata
-    vite.config.ts                Vite configuration and source alias
-    src/
-      main.tsx                    Router and theme providers
-      App.tsx                     The four application routes
-      pages/                      Landing, host, player, projector screens
-      features/
-        host/Results.tsx          Final standings and call history
-        board/ProjectorCallStage.tsx
-      components/                 Tickets, clue stage, claims, question editor, tutorial
-      hooks/
-        useGameRoom.ts            Socket lifecycle, refresh, reconnect and room state
-        usePlayerMarks.ts         Instant manual selection and server restoration
-      lib/
-        api.ts                    Typed API operations and ordered mark saves
-        http.ts                   Fetch, timeout, and error handling
-        sessions.ts               Local host/player session persistence
-        technicalBank.ts          Import/export and browser bank preferences
-        theme.tsx                 Light/dark theme
-        sound.ts                  Sound and speech helpers
-      styles/globals.css          Original visual styles
-  api/
-    src/
-      index.ts                    Process startup and graceful shutdown
-      app.ts                      Express, CORS, limits, health, Socket.IO
-      config.ts                   Environment loading and validation
-      errors.ts                   Application errors
-      db/                         pg adapter and migration runner
-      modules/games/
-        routes.ts                 REST handlers and bearer sessions
-        validation.ts             Request schemas
-        service.ts                Game lifecycle, draws, banks, marks and state
-        claims.ts                 Claim judgment, scoring and penalties
-        repository.ts             Game/player/ticket access and token helpers
-        ticket.ts                 Standard 90-ball ticket generation
-        models.ts                 Internal database row types
-      realtime/rooms.ts           Room admission and device presence
-    migrations/001_initial.sql    Portable PostgreSQL schema
-    test/                         Game, HTTP, socket and ticket verification
-packages/shared/src/
-  types.ts                        Shared data contracts
-  claims.ts                       Claim metadata and eligibility rules
-  bank.ts                         Original 90 technical items
-
-docs/DEPLOYMENT.md                 Vercel, Render, Neon and future AWS setup
-docs/API.md                        REST and socket reference
-docs/legacy/                       Historical InsForge SQL/scripts; not executable setup
-render.yaml                       Render Blueprint
-vercel.json                       Vercel SPA deployment settings
-Dockerfile                        Backend container for Render/AWS
+frontend/                         Deploy this folder to Vercel
+  package.json, package-lock.json  Independent dependencies
+  tsconfig.json, vite.config.ts    Independent build configuration
+  vercel.json                     Vite + SPA deployment settings
+  .env.example                    Browser API origin
+  README.md                       Frontend-only setup and deployment
+  src/
+    main.tsx, App.tsx             App entry and routes
+    pages/                        Landing, host, player, projector screens
+    features/                     Host results and projector call stage
+    components/                   Ticket, clues, claims, question editor, tutorial
+    hooks/                        Live rooms and manual marking
+    lib/                          API client, sessions, bank, theme, sound
+    shared/                       Local copies of contracts, rules, and bank
+    styles/                       Original visual styles
+backend/                          Deploy this folder to Render
+  package.json, package-lock.json  Independent dependencies
+  tsconfig.json, tsup.config.ts    Independent build configuration
+  Dockerfile, .dockerignore        Self-contained backend container
+  .env.example                    Database and server configuration
+  README.md                       Backend-only setup and deployment
+  src/
+    index.ts, app.ts, config.ts    Startup, Express, Socket.IO, environment
+    db/                           pg adapter and migration runner
+    modules/games/                Routes, validation, services, repository, tickets
+    realtime/                     Game room admission and presence
+    shared/                       Canonical contracts, claim rules, and bank
+  migrations/                     Portable PostgreSQL schema
+  test/                           Game, HTTP, socket and ticket verification
+scripts/sync-shared.mjs            Keep shared files in both apps identical
+docs/                             API, deployment, legacy reference, screenshots
+render.yaml                       Blueprint with rootDir: backend
 compose.yaml                      Optional local PostgreSQL
+package.json                      Optional root helpers to run both apps
 ```
+
+Each app can also be installed and run directly: `cd frontend && npm ci && npm run dev`
+or `cd backend && npm ci && npm run dev`. Neither build reads files from the other
+folder or requires the root helper package.
+
+Contracts, claim rules, and the 90-item bank are intentionally present in both
+`src/shared` directories so each deployment is self-contained. Edit the canonical
+files in `backend/src/shared`, then run `npm run sync:shared` from the repository
+root. `npm run check:shared` and CI detect mismatches.
 
 ## Screens and game flow
 
@@ -234,7 +225,7 @@ inspecting network responses.
 | --- | --- |
 | `npm run dev` | Start API and frontend together |
 | `npm run dev:web` / `npm run dev:api` | Start one application |
-| `npm run typecheck` | Check all workspaces |
+| `npm run typecheck` | Check frontend and backend independently |
 | `npm test` | Run isolated PostgreSQL/WASM, HTTP, Socket.IO and ticket tests |
 | `npm run build` | Build both production applications |
 | `npm run build:web` / `npm run build:api` | Build one application |
@@ -254,7 +245,7 @@ For a disposable browser test environment without a database connection:
 
 ```sh
 # Terminal 1: test API; all data disappears when this process exits
-npm exec -w @tambola/api -- tsx test/browser-server.ts
+npm --prefix backend run test:browser
 # Terminal 2
 npm run dev:web
 ```
@@ -277,6 +268,6 @@ The current socket adapter and rate limit store assume **one API instance**;
 multiple replicas require shared socket presence/event delivery and shared limits.
 
 Historical InsForge migrations and diagnostics live under `docs/legacy` as a
-reference. Only `apps/api/migrations` is applied to the new database.
+reference. Only `backend/migrations` is applied to the new database.
 
 Built by Ashutosh with love.

@@ -16,8 +16,8 @@ As of October 22, 2026:
 - Migration `001_initial.sql` is applied on both branches. The API passed a live
   check against the production database: create/join, start, draw, reveal, private
   and public state, and finish. One finished verification game remains.
-- Backend connection strings are stored locally in ignored `apps/api/.env` and
-  `apps/api/.env.staging`. They are not included in the repository.
+- Backend connection strings are stored locally in ignored `backend/.env` and
+  `backend/.env.staging`. They are not included in the repository.
 - Render and Vercel are awaiting manual deployment. Copy the production database
   connection variables from the local backend environment into Render, then set
   the resulting API URL in Vercel as described below.
@@ -31,7 +31,7 @@ to the Render backend to reduce the latency of game transactions.
 
 Copy the pooled connection string into `DATABASE_URL` and optionally the direct
 connection string into `MIGRATION_DATABASE_URL`. Keep the supplied SSL parameters.
-Set these in `apps/api/.env` locally and Render's environment for production.
+Set these in `backend/.env` locally and Render's environment for production.
 Never set either variable in Vercel or expose it with a `VITE_` prefix.
 
 ```sh
@@ -39,7 +39,7 @@ npm run db:status
 npm run db:migrate
 ```
 
-The migration runner applies only `apps/api/migrations/*.sql`, in filename order.
+The migration runner applies only `backend/migrations/*.sql`, in filename order.
 It records a checksum in `schema_migrations`; changing an applied file is an error.
 Add a new numbered migration for future schema changes. A transaction advisory
 lock prevents concurrent migration runners; all pending migrations commit together.
@@ -53,12 +53,13 @@ Reference: [Neon connection guide](https://neon.com/docs/connect/connect-from-an
 ## 2. Render API
 
 Connect the repository and use `render.yaml` as a Blueprint, or create a Node web
-service with the following settings. Leave the service root at the repository
-root so npm can resolve all workspaces and the root lockfile.
+service with the following settings. Set the service Root Directory to **`backend`**.
+It has its own package manifest, lockfile, source, and TypeScript configuration.
 
 | Setting | Value |
 | --- | --- |
-| Build command | `npm ci --include=dev && npm run build:api` |
+| Root Directory | `backend` |
+| Build command | `npm ci --include=dev && npm run build` |
 | Pre-deploy command | `npm run db:migrate:prod` |
 | Start command | `npm start` |
 | Health path | `/ready` |
@@ -85,15 +86,16 @@ Reference: [Render Express deployment](https://render.com/docs/deploy-node-expre
 
 ## 3. Vercel frontend
 
-Import the repository into Vercel with the **repository root** as the Root
-Directory. `vercel.json` supplies these settings:
+Import the repository into Vercel with **`frontend`** as the Root Directory.
+`frontend/vercel.json` supplies these settings:
 
 | Setting | Value |
 | --- | --- |
+| Root Directory | `frontend` |
 | Framework | Vite |
 | Install command | `npm ci` |
-| Build command | `npm run build:web` |
-| Output directory | `apps/web/dist` |
+| Build command | `npm run build` |
+| Output directory | `dist` |
 
 Set `VITE_API_URL` to your Render origin, for example
 `https://technical-tambola-api.onrender.com`, with no `/api` suffix. The HTTP
@@ -112,7 +114,7 @@ Reference: [Vercel Vite guide](https://vercel.com/docs/frameworks/frontend/vite)
 
 ## First deployment order
 
-1. Create the fresh Neon database.
+1. Use the already-configured Neon project, or create a fresh database for another environment.
 2. Create/import the Vercel project to determine its frontend origin.
 3. Configure Render's database variables and exact `WEB_ORIGINS`; build and migrate.
 4. Set Vercel's `VITE_API_URL` to the Render URL and deploy the frontend.
@@ -124,13 +126,13 @@ or connectivity between deployed services. Complete the last step after configur
 
 ## Backend container
 
-The root Dockerfile produces a Node backend container. It runs as the `node` user
+`backend/Dockerfile` produces a Node backend container. It runs as the `node` user
 and includes the compiled migration runner and SQL files.
 
 ```sh
-docker build -t technical-tambola-api .
-docker run --rm --env-file apps/api/.env technical-tambola-api npm run db:migrate:prod
-docker run --rm --env-file apps/api/.env -e NODE_ENV=production -p 3001:3001 technical-tambola-api
+docker build -t technical-tambola-api backend
+docker run --rm --env-file backend/.env technical-tambola-api npm run db:migrate:prod
+docker run --rm --env-file backend/.env -e NODE_ENV=production -p 3001:3001 technical-tambola-api
 ```
 
 For a database running on the host, use the host address appropriate to your

@@ -53,7 +53,7 @@ The host cannot mark or claim, and claims are disabled while paused or finished.
 
 ## Game state
 
-Shared TypeScript definitions live in `packages/shared/src/types.ts`. The state
+Shared TypeScript definitions live in `backend/src/shared/types.ts`. The state
 has `game_id`, `code`, `status`, `settings`, `players`, `calls`, `claims`, and `me`.
 `me` is null for public requests. A player receives only their own ticket, marks,
 and cuts. Host state contains an empty ticket because the host does not play.

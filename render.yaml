@@ -2,8 +2,9 @@ services:
   - type: web
     name: technical-tambola-api
     runtime: node
+    rootDir: backend
     plan: starter
-    buildCommand: npm ci --include=dev && npm run build:api
+    buildCommand: npm ci --include=dev && npm run build
     preDeployCommand: npm run db:migrate:prod
     startCommand: npm start
     healthCheckPath: /ready
