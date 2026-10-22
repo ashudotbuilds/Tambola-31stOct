@@ -3,6 +3,7 @@ services:
     name: technical-tambola-api
     runtime: node
     rootDir: backend
+    region: singapore
     plan: starter
     buildCommand: npm ci --include=dev && npm run build
     preDeployCommand: npm run db:migrate:prod

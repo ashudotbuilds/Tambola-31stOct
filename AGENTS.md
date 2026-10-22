@@ -9,8 +9,10 @@
 - Each app has its own lockfile and TypeScript config and builds independently.
 - Do not reintroduce cross-folder build dependencies or npm workspaces.
 - Database: Neon PostgreSQL through `pg`. Future target: AWS with PostgreSQL/RDS.
-- The user chose a fresh database. Neon project `technical-tambola`
-  (`polished-wind-74710779`) is provisioned with production and staging branches.
+- Active Neon project: `technical-tambola-singapore` (`rough-darkness-08881760`),
+  region `aws-ap-southeast-1`, with production and staging branches.
+- Use Singapore for the Render backend too. Neon currently has no Mumbai region.
+- The previous Oregon project is retained as a fallback; do not delete it without approval.
 - Production and staging migrations passed, and a live Neon/API smoke check passed.
 - The user will deploy Vercel and Render manually.
 

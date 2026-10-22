@@ -8,21 +8,32 @@ created by running the build or tests.
 
 As of October 22, 2026:
 
-- Neon project: `technical-tambola` (`polished-wind-74710779`), in AWS US West
-  (Oregon), PostgreSQL 17.
+- Active Neon project: `technical-tambola-singapore` (`rough-darkness-08881760`),
+  in AWS Asia Pacific (Singapore), `aws-ap-southeast-1`, PostgreSQL 17.
 - Database: `tambola`; role: `tambola_owner`.
-- Production branch: `br-patient-glitter-arjb90xm`.
-- Staging branch: `br-delicate-fire-ar5km1qd`.
+- Production branch: `br-plain-boat-az7tbcjw`.
+- Staging branch: `br-divine-haze-azd11d7z`.
 - Migration `001_initial.sql` is applied on both branches. The API passed a live
   check against the production database: create/join, start, draw, reveal, private
-  and public state, and finish. One finished verification game remains.
+  and public state, and finish. Finished verification games remain in the database.
+- Existing data was copied from the Oregon production/staging branches and verified
+  row-for-row before switching connections. The Oregon project
+  `polished-wind-74710779` is retained as a fallback, with local connection backups
+  in ignored `backend/.env.oregon` and `backend/.env.oregon.staging`.
 - Backend connection strings are stored locally in ignored `backend/.env` and
   `backend/.env.staging`. They are not included in the repository.
 - Render and Vercel are awaiting manual deployment. Copy the production database
   connection variables from the local backend environment into Render, then set
   the resulting API URL in Vercel as described below.
 
-The existing Neon project `techtombola` was not modified.
+Neon currently has no Mumbai region; Singapore is the selected region for this
+India-focused deployment. Choose Singapore for the Render API too so backend
+queries stay close to the database. See [Neon regions](https://neon.com/docs/introduction/regions)
+and [Render regions](https://render.com/docs/regions).
+
+If you already copied Oregon connection strings into Render, replace both
+`DATABASE_URL` and `MIGRATION_DATABASE_URL` with the current Singapore values from
+`backend/.env`, then redeploy. The existing Neon project `techtombola` was not modified.
 
 ## 1. Neon PostgreSQL
 
@@ -59,6 +70,7 @@ It has its own package manifest, lockfile, source, and TypeScript configuration.
 | Setting | Value |
 | --- | --- |
 | Root Directory | `backend` |
+| Region | Singapore |
 | Build command | `npm ci --include=dev && npm run build` |
 | Pre-deploy command | `npm run db:migrate:prod` |
 | Start command | `npm start` |

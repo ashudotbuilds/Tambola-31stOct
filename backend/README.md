@@ -28,6 +28,7 @@ checks the database/schema. The database connection strings stay server-side.
 | Setting | Value |
 | --- | --- |
 | Root Directory | `backend` |
+| Region | Singapore (same region as Neon) |
 | Runtime | Node |
 | Build Command | `npm ci --include=dev && npm run build` |
 | Start Command | `npm start` |
