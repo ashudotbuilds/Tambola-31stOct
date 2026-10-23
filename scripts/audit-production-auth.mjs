@@ -7,11 +7,18 @@ const require = createRequire(import.meta.url)
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/ashut/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright')
 const dist = resolve('frontend/dist')
 const origin = 'http://localhost:5174'
+const deployment = JSON.parse(await readFile('frontend/vercel.json', 'utf8'))
 const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.svg': 'image/svg+xml' }
 // Emulate the deployment's external rewrites against the isolated local demo.
 const server = createServer(async (req, res) => {
   if (/^\/(api|socket\.io)(\/|\?)/.test(req.url)) {
-    const upstream = request('http://127.0.0.1:3001' + req.url, { method: req.method, headers: { ...req.headers, host: '127.0.0.1:3001' } }, response => {
+    const url = new URL(req.url, origin)
+    const rule = deployment.routes.find(rule => rule.env && new RegExp('^' + rule.src + '$').test(url.pathname))
+    assert.ok(rule, 'Missing deployed proxy route')
+    assert.deepEqual(rule.env, ['VITE_API_URL'])
+    const match = url.pathname.match(new RegExp('^' + rule.src + '$'))
+    const destination = rule.dest.replace('$VITE_API_URL', 'http://127.0.0.1:3001').replace('$1', match[1]) + url.search
+    const upstream = request(destination, { method: req.method, headers: { ...req.headers, host: '127.0.0.1:3001' } }, response => {
       res.writeHead(response.statusCode, response.headers)
       response.pipe(res)
     })

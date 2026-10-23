@@ -116,7 +116,7 @@ Reference: [Render Express deployment](https://render.com/docs/deploy-node-expre
 ## 3. Vercel frontend
 
 Import the repository into Vercel with **`frontend`** as the Root Directory.
-`frontend/vercel.mjs` supplies these settings:
+`frontend/vercel.json` supplies these settings:
 
 | Setting | Value |
 | --- | --- |
@@ -127,8 +127,10 @@ Import the repository into Vercel with **`frontend`** as the Root Directory.
 | Output directory | `dist` |
 
 Set `VITE_API_URL` to your Render origin, for example
-`https://technical-tambola-api.onrender.com`, with no `/api` suffix. Vercel evaluates
-this variable in `frontend/vercel.mjs` to proxy `/api` and `/socket.io` to Render.
+`https://technical-tambola-api.onrender.com`, with no `/api` suffix. The explicit
+`routes` in `frontend/vercel.json` use the deployment environment variable to
+proxy `/api` and `/socket.io` to Render. The filesystem handler serves built
+assets before the final SPA fallback.
 Production browsers connect to their own frontend origin, so HttpOnly account
 cookies work even when third-party cookies are blocked. Socket.IO uses HTTP
 polling through this proxy and continues to deliver live game invalidations.

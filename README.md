@@ -104,7 +104,7 @@ service keys are needed by the browser. Environment files are ignored by Git.
 frontend/                         Deploy this folder to Vercel
   package.json, package-lock.json  Independent dependencies
   tsconfig.json, vite.config.ts    Independent build configuration
-  vercel.mjs                      Vite + API proxy + SPA deployment settings
+  vercel.json                      Vite + API proxy + SPA deployment settings
   .env.example                    Browser API origin
   README.md                       Frontend-only setup and deployment
   src/

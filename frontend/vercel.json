@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "$VITE_API_URL/api/$1",
+      "env": ["VITE_API_URL"]
+    },
+    {
+      "src": "/socket.io/(.*)",
+      "dest": "$VITE_API_URL/socket.io/$1",
+      "env": ["VITE_API_URL"]
+    },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
