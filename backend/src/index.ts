@@ -8,8 +8,14 @@ const db = postgresDatabase(config.DATABASE_URL, config.DATABASE_POOL_MAX)
 let demoAccounts: Awaited<ReturnType<typeof configureTestingAccounts>>
 try {
   demoAccounts = await configureTestingAccounts(db, config.TEST_ACCOUNTS_ENABLED)
-} catch {
-  console.error('Testing account setup failed. Check database connectivity, migrations, and reserved testing account IDs.')
+} catch (error) {
+  const code = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' && /^[A-Z0-9]{5}$/.test(error.code) ? error.code : 'unknown'
+  const guidance = ['42703', '42P01'].includes(code)
+    ? 'Database schema is out of date. Run npm run db:migrate:prod before starting the server.'
+    : code === '23505'
+      ? 'A reserved testing account ID conflicts with an existing account.'
+      : 'Check database connectivity, migrations, and reserved testing account IDs.'
+  console.error(`Testing account setup failed (${code}). ${guidance}`)
   await db.close()
   process.exit(1)
 }

@@ -7,7 +7,7 @@
     "dev:demo": "tsx test/demo-server.ts",
     "dev": "tsx watch src/index.ts",
     "build": "tsc --noEmit && tsup",
-    "start": "node dist/index.js",
+    "start": "npm run db:migrate:prod && node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && tsx --test test/*.test.ts",
     "db:migrate": "tsx src/db/migrate.ts",
