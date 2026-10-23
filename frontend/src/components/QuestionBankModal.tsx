@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   DEFAULT_TECHNICAL_BANK,
   exportBankToJson,
@@ -22,6 +22,16 @@ export function QuestionBankModal({ isOpen, onClose, currentBank, onSaveBank }: 
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!isOpen) return
+    const previous = document.activeElement as HTMLElement | null
+    const dialog = dialogRef.current
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    dialog?.focus()
+    return () => { document.body.style.overflow = originalOverflow; previous?.focus() }
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -85,7 +95,15 @@ export function QuestionBankModal({ isOpen, onClose, currentBank, onSaveBank }: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Question bank" tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 sm:p-4" onKeyDown={event => {
+      if (event.key === 'Escape' && !saving) { event.preventDefault(); event.stopPropagation(); onClose() }
+      if (event.key !== 'Tab') return
+      const controls = [...(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href]') ?? [])]
+      const first = controls[0], last = controls.at(-1)
+      if (!first) { event.preventDefault(); return }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialogRef.current)) { event.preventDefault(); first.focus() }
+    }}>
       {saving && <p role="status" className="fixed top-3 z-50 rounded-lg bg-panel px-4 py-2 text-sm text-cyan">Saving questions…</p>}
       <div
         className={`card flex flex-col max-h-[92vh] w-full max-w-4xl overflow-hidden p-3.5 sm:p-6 shadow-2xl ${
@@ -96,7 +114,7 @@ export function QuestionBankModal({ isOpen, onClose, currentBank, onSaveBank }: 
         <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4 border-edge/60">
           <div>
             <h2 className="text-xl font-black flex items-center gap-2">
-              <span>⚡ Technical Questions Bank</span>
+              <span>Question bank</span>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan/15 text-cyan border border-cyan/40">
                 {currentBank.length} Items
               </span>
@@ -146,7 +164,7 @@ export function QuestionBankModal({ isOpen, onClose, currentBank, onSaveBank }: 
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-2 text-slate-400 hover:text-slate-100 hover:bg-ink/50"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-slate-400 hover:text-slate-100 hover:bg-ink/50"
               aria-label="Close modal"
             >
               ✕

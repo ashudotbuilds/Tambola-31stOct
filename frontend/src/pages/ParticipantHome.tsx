@@ -8,6 +8,8 @@ import {
   type ParticipantRoundInfo,
 } from '@/lib/api'
 import { request } from '@/lib/http'
+import { ArrowRight, LogOut } from 'lucide-react'
+import { GameHeader, PlaySteps } from '@/components/GameChrome'
 export default function ParticipantHome() {
   const navigate = useNavigate()
   const [name, setName] = useState(''),
@@ -44,9 +46,8 @@ export default function ParticipantHome() {
       </main>
     )
   return (
-    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-5 px-4 py-8">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-black">Welcome, {name}</h1>
+    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-7 px-4 py-6 sm:px-6 sm:py-8">
+      <GameHeader section="Player lounge">
         <button
           className="btn"
           onClick={async () => {
@@ -54,11 +55,12 @@ export default function ParticipantHome() {
             navigate('/login', { replace: true })
           }}
         >
-          Sign out
+          <LogOut size={14} aria-hidden="true" />Sign out
         </button>
-      </header>
+      </GameHeader>
+      <div className="pt-3"><p className="eyebrow text-cyan">Welcome, {name}</p><h1 className="mt-3 text-4xl font-bold sm:text-5xl">Got a game code?</h1><p className="mt-3 text-sm text-slate-400">Your ticket is one code away.</p></div>
       <form
-        className="card space-y-3 p-5"
+        className="card join-panel space-y-5"
         onSubmit={async (event) => {
           event.preventDefault()
           setBusy(true)
@@ -75,7 +77,7 @@ export default function ParticipantHome() {
           }
         }}
       >
-        <h2 className="text-xl font-bold">Join a game</h2>
+        <h2 className="text-2xl font-bold">Join a game</h2>
         <p className="text-sm text-slate-400">
           Enter the administrator’s code. Practice with the tutorial while
           waiting for the game to start.
@@ -83,7 +85,11 @@ export default function ParticipantHome() {
         <label className="block text-sm">
           Game code
           <input
-            className="field mt-1 uppercase"
+            className="field join-code mt-2"
+            placeholder="______"
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
             value={code}
             onChange={(event) => setCode(event.target.value.toUpperCase())}
             required
@@ -91,10 +97,11 @@ export default function ParticipantHome() {
             maxLength={6}
           />
         </label>
-        <button className="btn btn-primary" disabled={busy}>
-          Join game
+        <button className="btn btn-primary w-full sm:w-auto sm:min-w-52" disabled={busy}>
+          Join game<ArrowRight size={16} className="ml-auto" aria-hidden="true" />
         </button>
       </form>
+      <PlaySteps />
       <details className="card p-5">
         <summary className="cursor-pointer font-bold">Account settings</summary>
         <form

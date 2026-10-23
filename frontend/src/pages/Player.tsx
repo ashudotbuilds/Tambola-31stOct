@@ -178,7 +178,7 @@ export default function PlayerScreen() {
             <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan">
               {me?.name ?? session.display_name}
             </p>
-            <h1 className="text-lg sm:text-xl font-black">Technical Ticket</h1>
+            <h1 className="text-lg sm:text-xl font-black">Technical Tambola</h1>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -204,7 +204,7 @@ export default function PlayerScreen() {
           <button
             type="button"
             onClick={() => setShowNumbersOnly((prev) => !prev)}
-            className="text-[11px] font-semibold underline text-slate-400 hover:text-cyan"
+            className="min-h-11 px-2 text-[11px] font-semibold underline text-slate-400 hover:text-cyan"
             title="Toggle between technical terms and 1-90 numbers"
           >
             {showNumbersOnly ? 'Show Terms' : 'Show #'}
@@ -221,6 +221,8 @@ export default function PlayerScreen() {
           </div>
         </div>
       </section>
+
+      <div aria-label={`${state?.calls.length ?? 0} of 90 questions called`} className="game-progress"><span style={{ width: `${((state?.calls.length ?? 0) / 90) * 100}%` }} /></div>
 
       {/* Active Question / Clue Stage */}
       {call && callItem && (

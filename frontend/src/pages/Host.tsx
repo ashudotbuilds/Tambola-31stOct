@@ -1,4 +1,5 @@
 import { Results } from '@/features/host/Results'
+import { ArrowLeft, BookOpen, MonitorUp, Volume2, VolumeX } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useNavigate } from 'react-router-dom'
@@ -267,7 +268,7 @@ export default function HostScreen() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link to="/admin" className="text-sm font-black tracking-tight text-slate-500 hover:text-cyan">
-            ←
+            <ArrowLeft size={18} aria-label="Back to administration" />
           </Link>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan">Host console</p>
@@ -286,11 +287,11 @@ export default function HostScreen() {
             className="btn px-3 py-2 text-xs font-bold text-cyan"
             title="View or edit the 90 technical questions"
           >
-            ⚡ Question Bank
+            <BookOpen size={15} aria-hidden="true" />Question Bank
           </button>
 
           <button type="button" onClick={toggleMute} className="btn px-3 py-2 text-xs">
-            {muted ? '🔇 Muted' : '🔊 Sound'}
+            {muted ? <VolumeX size={15} aria-hidden="true" /> : <Volume2 size={15} aria-hidden="true" />}{muted ? 'Muted' : 'Sound'}
           </button>
 
           <Link
@@ -298,7 +299,7 @@ export default function HostScreen() {
             target="_blank"
             className="btn px-3 py-2 text-xs"
           >
-            Projector view ↗
+            <MonitorUp size={15} aria-hidden="true" />Projector view
           </Link>
         </div>
       </header>
@@ -375,7 +376,7 @@ export default function HostScreen() {
               <div className="card flex flex-wrap items-center gap-3 p-4">
                 <button
                   type="button"
-                  className="btn btn-primary flex-1 text-base sm:text-lg font-bold"
+                  className="btn btn-primary w-full flex-none text-sm font-bold sm:w-auto sm:flex-1 sm:text-base"
                   disabled={callBlocked}
                   onClick={call}
                 >
@@ -383,7 +384,7 @@ export default function HostScreen() {
                     ? 'Game over'
                     : status === 'paused'
                       ? 'Paused'
-                      : `Call Next Question (${state?.calls.length ?? 0}/90) [Space]`}
+                      : <>Call Next Question <span className="font-mono text-xs opacity-70">{state?.calls.length ?? 0}/90</span><kbd className="hidden rounded border border-current/30 px-1 text-[9px] sm:inline">Space</kbd></>}
                 </button>
 
                 {pendingCalls.length > 0 && (

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import { Moon, Sun } from 'lucide-react'
 
 export type Theme = 'light' | 'dark'
 
@@ -11,13 +12,13 @@ interface ThemeContextType {
 const THEME_STORAGE_KEY = 'tt.theme'
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'light',
+  theme: 'dark',
   toggleTheme: () => {},
   setTheme: () => {},
 })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('light')
+  const [theme, setThemeState] = useState<Theme>('dark')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -26,11 +27,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (stored === 'dark' || stored === 'light') {
         setThemeState(stored)
       } else {
-        // Default to light to match user's screenshot style
-        setThemeState('light')
+        setThemeState('dark')
       }
     } catch {
-      setThemeState('light')
+      setThemeState('dark')
     }
     setMounted(true)
   }, [])
@@ -38,7 +38,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!mounted) return
     try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme)
       if (theme === 'light') {
         document.documentElement.classList.add('light')
         document.documentElement.classList.remove('dark')
@@ -46,6 +45,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         document.documentElement.classList.add('dark')
         document.documentElement.classList.remove('light')
       }
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#161513' : '#f1ebdf')
+      localStorage.setItem(THEME_STORAGE_KEY, theme)
     } catch {
       // ignore
     }
@@ -77,25 +78,12 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
     <button
       type="button"
       onClick={toggleTheme}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all border ${
-        theme === 'light'
-          ? 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 shadow-sm'
-          : 'border-edge bg-panel text-slate-300 hover:bg-ink'
-      } ${className}`}
+      className={`btn min-h-11 px-3 text-xs ${className}`}
       title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
       aria-label="Toggle theme"
     >
-      {theme === 'light' ? (
-        <>
-          <span className="text-amber-500 text-sm">☀️</span>
-          <span className="text-[11px] font-medium">Light</span>
-        </>
-      ) : (
-        <>
-          <span className="text-cyan text-sm">🌙</span>
-          <span className="text-[11px] font-medium">Dark</span>
-        </>
-      )}
+      {theme === 'light' ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
+      <span>{theme === 'light' ? 'Light' : 'Dark'}</span>
     </button>
   )
 }

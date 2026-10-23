@@ -20,6 +20,7 @@ async function role(id, width = 390) {
   await page.goto(origin)
   await page.getByRole('button', { name: new RegExp(`^${id === 'superadmin' ? 'Super Admin' : id === 'admin1' ? 'Admin 1' : `Member ${id.slice(-1)}`} `) }).click()
   await page.waitForURL(id.startsWith('user') ? '**/account' : '**/admin')
+  await page.getByRole('heading', { name: id.startsWith('user') ? 'Got a game code?' : 'Game control.', exact: true }).waitFor()
   return { context, page, id }
 }
 async function measure(actor, name) {
@@ -42,6 +43,27 @@ async function gameRequest(actor, host, action, method = 'GET', body, token) {
   return response.json()
 }
 try {
+  const entryContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+  const entry = { page: await entryContext.newPage() }
+  await entry.page.goto(origin)
+  await entry.page.getByRole('heading', { name: 'Technical Tambola', exact: true }).waitFor()
+  await entry.page.getByRole('heading', { name: 'Testing accounts', exact: true }).waitFor()
+  assert.equal(await entry.page.locator('html').getAttribute('class'), 'dark')
+  await entry.page.getByLabel('Password', { exact: true }).fill('visibility-check')
+  await entry.page.getByRole('button', { name: 'Show password', exact: true }).click()
+  assert.equal(await entry.page.getByLabel('Password', { exact: true }).getAttribute('type'), 'text')
+  await entry.page.getByRole('button', { name: 'Hide password', exact: true }).click()
+  await entry.page.getByLabel('Password', { exact: true }).fill('')
+  await entry.page.evaluate(() => document.fonts.ready)
+  await measure(entry, 'login-dark')
+  await entry.page.emulateMedia({ reducedMotion: 'reduce' })
+  assert.equal(await entry.page.getByRole('button', { name: 'Toggle theme', exact: true }).evaluate(element => getComputedStyle(element).transitionDuration), '1e-05s')
+  await entry.page.emulateMedia({ reducedMotion: 'no-preference' })
+  await entry.page.getByRole('button', { name: 'Toggle theme', exact: true }).click()
+  await entry.page.reload()
+  await entry.page.waitForFunction(() => document.documentElement.classList.contains('light'))
+  await measure(entry, 'login-light')
+  await entryContext.close()
   const root = await role('superadmin', 1280)
   const admin = await role('admin1')
   const diagnostics = await root.context.request.get('http://localhost:3001/api/v1/super-admin/system')
@@ -51,9 +73,17 @@ try {
   await admin.page.getByRole('button', { name: 'Create a game', exact: true }).first().click()
   await admin.page.waitForURL('**/host')
   const host = await admin.page.evaluate(() => JSON.parse(localStorage.getItem(`tt.v2.host:${localStorage.getItem('tt.account.id')}`)))
+  await admin.page.getByRole('button', { name: 'Question Bank', exact: true }).click()
+  await admin.page.getByRole('dialog', { name: 'Question bank', exact: true }).waitFor()
+  await measure(admin, 'question-bank')
+  await admin.page.keyboard.press('Tab')
+  assert.equal(await admin.page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]')), true)
+  await admin.page.keyboard.press('Escape')
+  await admin.page.getByRole('dialog').waitFor({ state: 'hidden' })
   const players = []
   for (const id of ['user1', 'user2', 'user3']) {
     const actor = await role(id)
+    if (id === 'user1') await measure(actor, 'player-home')
     await actor.page.getByLabel('Game code', { exact: true }).fill(host.code)
     await actor.page.getByRole('button', { name: 'Join game', exact: true }).click()
     await actor.page.waitForURL('**/play')

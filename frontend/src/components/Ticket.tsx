@@ -74,7 +74,7 @@ export function Ticket({
 
   return (
     <div
-      className={`card relative p-2.5 sm:p-4 transition-all ${className} ${
+      className={`card ticket-surface relative p-2.5 sm:p-4 ${className} ${
         isLight ? 'bg-white border-slate-200 shadow-sm' : ''
       }`}
     >
@@ -209,7 +209,7 @@ export function Ticket({
                   </span>
 
                   {/* Main Technical Term Text */}
-                  <span className="w-full px-0.5 text-center text-[10px] sm:text-[11px] md:text-xs font-semibold leading-tight break-words line-clamp-3">
+                  <span className={`w-full px-0.5 text-center ${mobileFit ? 'text-[9px] sm:text-xs' : 'text-xs'} font-semibold leading-tight break-words line-clamp-3`}>
                     {displayText}
                   </span>
 
@@ -255,7 +255,7 @@ export function Ticket({
           }`}
         >
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 font-bold">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5 break-words font-bold">
               <span className="font-mono text-cyan">#{inspectedItem.id}</span>
               <span>{inspectedItem.term}</span>
               <span className="text-[10px] font-normal opacity-70">({inspectedItem.category})</span>

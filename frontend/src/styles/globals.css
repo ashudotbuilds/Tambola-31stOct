@@ -4,10 +4,18 @@
 
 :root {
   color-scheme: dark;
+  --paper: #161513;
+  --muted: #b4a897;
+  --accent: #ff8a4c;
+  --button-shadow: #0e0d0b;
 }
 
 html.light {
   color-scheme: light;
+  --paper: #f1ebdf;
+  --muted: #6e6153;
+  --accent: #ad400d;
+  --button-shadow: #d4c7b5;
 }
 
 html,
@@ -16,47 +24,59 @@ body {
 }
 
 body {
-  @apply bg-ink text-slate-100 antialiased transition-colors duration-200;
-  background-image:
-    radial-gradient(circle at 20% -10%, rgba(34, 211, 238, 0.12), transparent 45%),
-    radial-gradient(circle at 85% 0%, rgba(163, 230, 53, 0.1), transparent 40%);
-  background-attachment: fixed;
+  @apply text-slate-100 antialiased;
+  background: var(--paper);
+  font-size: 15px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html.light body {
-  @apply bg-[#f4f6f9] text-slate-800;
-  background-image:
-    radial-gradient(circle at 20% -10%, rgba(14, 165, 233, 0.08), transparent 45%),
-    radial-gradient(circle at 85% 0%, rgba(16, 185, 129, 0.08), transparent 40%);
+  @apply text-slate-800;
 }
+
+::selection { background: #ff8a4c; color: #161513; }
+h1, h2, h3 { @apply font-display; }
+h1 { letter-spacing: -0.035em; }
+button, a, summary { touch-action: manipulation; }
+button:focus-visible, a:focus-visible, summary:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+summary { min-height: 44px; align-content: center; }
+pre { tab-size: 2; }
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-edge bg-panel/80 backdrop-blur transition-colors;
+    @apply rounded-xl border border-edge bg-panel;
   }
 
   html.light .card {
-    @apply border-slate-200 bg-white/95 shadow-sm text-slate-800;
+    @apply border-slate-300 text-slate-800;
+    background: #f8f3e9;
   }
 
   .btn {
-    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl border border-edge
-           bg-panel px-4 py-3 text-sm font-semibold uppercase tracking-wide text-slate-200
-           transition hover:border-cyan/60 hover:text-cyan
+    @apply inline-flex min-h-11 select-none items-center justify-center gap-2 rounded-md border border-edge
+           bg-panel px-4 py-3 font-mono text-xs font-normal text-slate-200
+           hover:border-cyan hover:text-cyan
            focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan
-           disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-edge disabled:hover:text-slate-200;
+           disabled:cursor-not-allowed disabled:opacity-40;
+    box-shadow: 0 3px 0 var(--button-shadow);
+    transition: background-color 140ms, border-color 140ms, color 140ms, transform 100ms, box-shadow 100ms;
+    text-transform: none;
   }
 
+  .btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--button-shadow); }
+
   html.light .btn {
-    @apply border-slate-300 bg-white text-slate-700 hover:border-cyan/70 hover:bg-slate-50 hover:text-slate-900 shadow-sm;
+    @apply border-slate-300 text-slate-800 hover:border-cyan;
+    background: #f8f3e9;
   }
 
   .btn-primary {
-    @apply border-cyan/70 bg-cyan/15 text-cyan hover:bg-cyan/25;
+    @apply border-cyan bg-cyan text-ink hover:bg-[#ff9c68] hover:text-ink;
+    box-shadow: 0 3px 0 #9c461b;
   }
 
   html.light .btn-primary {
-    @apply border-cyan/80 bg-cyan/15 text-cyan hover:bg-cyan/25;
+    @apply border-[#a83c0b] bg-[#ba4a17] text-white hover:bg-[#a83c0b] hover:text-white;
   }
 
   .btn-danger {
@@ -68,22 +88,59 @@ html.light body {
   }
 
   .field {
-    @apply w-full rounded-xl border border-edge bg-ink/80 px-4 py-3 text-base text-slate-100
+    @apply min-h-12 min-w-0 w-full rounded-md border border-edge bg-ink px-4 py-3 text-base text-slate-100
            placeholder:text-slate-500 focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan focus-visible:ring-2 focus-visible:ring-cyan;
   }
 
   html.light .field {
-    @apply border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-cyan;
+    @apply border-slate-300 text-slate-900 placeholder:text-slate-600 focus:border-cyan;
+    background: #fffcf6;
   }
 
   .label {
-    @apply mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-400;
+    @apply mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400;
   }
 
   html.light .label {
     @apply text-slate-500;
   }
 }
+
+.game-header { @apply flex flex-wrap items-center justify-between gap-4 border-b border-edge pb-5; }
+.game-wordmark { @apply font-display text-xl font-bold tracking-tight; }
+.eyebrow { @apply font-mono text-[10px] uppercase tracking-[0.18em] text-slate-400; }
+.login-shell { @apply mx-auto min-h-dvh max-w-7xl px-5 sm:px-8; }
+.login-layout { @apply grid gap-10 py-10 md:py-16 lg:grid-cols-[1.15fr_0.85fr] lg:gap-20; }
+.login-title { @apply font-display text-[clamp(3.2rem,8vw,6rem)] font-bold uppercase leading-[0.96]; letter-spacing: -0.045em; }
+.ticket-preview { @apply mt-9 rounded-lg border border-edge bg-panel p-4 sm:p-6; box-shadow: 6px 6px 0 #0e0d0b; transform: rotate(-1.5deg); }
+.preview-cell { @apply relative flex min-h-10 items-center justify-center rounded-sm border border-edge font-mono text-[8px] sm:min-h-12 sm:text-[10px]; }
+.preview-cell.is-empty { @apply border-dashed opacity-40; }
+.preview-cell.is-marked { @apply border-cyan bg-cyan text-ink; }
+.preview-cell svg { position: absolute; right: 2px; bottom: 2px; }
+.play-steps { @apply grid divide-y divide-edge; }
+.play-steps li { @apply flex items-center gap-4 py-4; }
+.login-form { @apply relative rounded-lg border border-edge bg-panel p-6 sm:p-8; }
+.login-form::before { content: ''; position: absolute; height: 3px; top: -1px; left: 24px; right: 24px; background: var(--accent); }
+.join-panel { @apply relative overflow-hidden border-l-4 border-l-cyan p-5 sm:p-8; }
+.join-code { @apply font-mono text-3xl uppercase tracking-[0.3em] sm:text-4xl; }
+.admin-nav { @apply sticky top-0 z-30 flex gap-1 overflow-x-auto border-b border-edge py-3; background: var(--paper); }
+.admin-nav a { @apply whitespace-nowrap rounded-md px-4 py-3 font-mono text-xs text-slate-400 hover:bg-panel hover:text-cyan; }
+.admin-nav a:first-child { @apply bg-panel text-cyan; }
+.admin-workspace > section { scroll-margin-top: 80px; }
+.admin-workspace dl dd { @apply font-mono; }
+.admin-workspace section > h2, .admin-workspace section > div > h2 { @apply text-xl; }
+.ticket-surface { @apply border-t-2 border-t-cyan; }
+.ticket-surface .cell[aria-pressed="true"] { box-shadow: inset 0 -3px 0 #688049; }
+.ticket-surface .cell { transition: background-color 120ms, border-color 120ms, transform 100ms; }
+.ticket-surface .cell:active { transform: translateY(2px); }
+.game-progress { height: 3px; width: 100%; background: #454038; overflow: hidden; }
+.game-progress > span { display: block; height: 100%; background: var(--accent); transition: width 250ms; }
+.login-footer { @apply flex flex-wrap justify-between gap-2 border-t border-edge py-5 font-mono text-[10px] uppercase tracking-widest text-slate-500; }
+@media (max-width: 639px) {
+  .btn, .admin-nav a { min-height: 44px; }
+}
+html.light .ticket-preview, html.light .login-form { background: #f8f3e9; }
+html.light .ticket-preview { box-shadow: 6px 6px 0 #d4c7b5; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -96,11 +153,11 @@ html.light body {
 
 /* Keep muted copy and accent text readable against light surfaces. */
 html.light .text-slate-400 {
-  color: #475569;
+  color: #6e6153;
 }
 
 html.light .text-slate-300 {
-  color: #475569;
+  color: #655a4c;
 }
 
 html.light .round-ticket-cell {
@@ -116,14 +173,16 @@ html.light .round-ticket-cell[data-cut="true"] {
 }
 
 html.light [class~="text-cyan"] {
-  color: #0e7490;
+  color: #ad400d;
 }
+
+html.light .btn-primary { color: #fff; }
 
 /* A ticket cell that can display technical terms, outputs, or numbers */
 @layer utilities {
   .cell {
     @apply relative flex min-h-[58px] sm:min-h-[72px] md:min-h-[78px] items-center justify-center rounded-md border text-[10px] sm:text-xs font-bold
-           text-center leading-tight transition-all sm:rounded-lg p-1 select-none active:scale-95;
+           text-center leading-tight sm:rounded-md p-1 select-none;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }

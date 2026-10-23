@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "project": {
+    "name": "Technical Tambola",
+    "productType": "Multiplayer technical clue game",
+    "stack": [
+      "React 19",
+      "Vite",
+      "TypeScript",
+      "Tailwind CSS 3"
+    ]
+  },
+  "sources": {
+    "tokens": [
+      "frontend/tailwind.config.ts",
+      "frontend/src/styles/globals.css"
+    ],
+    "components": [
+      "frontend/src/components/GameChrome.tsx",
+      "frontend/src/components/Ticket.tsx"
+    ],
+    "assets": [],
+    "instructions": [
+      "AGENTS.md"
+    ]
+  },
+  "design": {
+    "colorMode": "dark default, optional warm light",
+    "colors": {
+      "background": "#161513",
+      "surface": "#211f1b",
+      "border": "#454038",
+      "accent": "#ff8a4c",
+      "text": "#f2ebdf"
+    },
+    "typography": {
+      "display": "Chakra Petch",
+      "body": "Space Grotesk",
+      "metadata": "Space Mono"
+    },
+    "spacing": {},
+    "radius": {},
+    "shadows": {},
+    "motion": {
+      "duration": "100–180ms",
+      "reducedMotion": true
+    },
+    "density": "compact readable"
+  },
+  "components": {
+    "installed": [],
+    "preferredPrimitives": [],
+    "patterns": []
+  },
+  "constraints": {
+    "must": [
+      "Mobile first, 320px minimum viewport",
+      "Preserve all game behavior and routes",
+      "Dark mode default, orange primary actions",
+      "Only Technical Tambola product name, no logo",
+      "Self-host fonts, no new environment variables"
+    ],
+    "avoid": [
+      "Decorative gradients or glass effects",
+      "Looping attention animations",
+      "Additional branding",
+      "Microscopic fit-to-screen tickets"
+    ]
+  },
+  "decisions": [
+    {
+      "date": "2026-10-23",
+      "decision": "Warm retro game console: charcoal surfaces, orange physical buttons, crisp borders and technical typography.",
+      "source": "User requested retro dark orange theme."
+    },
+    {
+      "date": "2026-10-23",
+      "decision": "Use established React primitives; adopt tactile interaction inspiration from 21st Retro Button and terminal-panel references from Indie Bytes. MCP catalog unavailable; no unverified component code imported."
+    }
+  ],
+  "evidence": [
+    {
+      "fact": "project.instructions",
+      "source": "AGENTS.md"
+    }
+  ],
+  "generatedAt": "2026-10-23T11:29:45.472Z"
+}

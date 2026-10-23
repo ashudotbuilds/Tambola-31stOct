@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { addEventKey, addRoundQuestion, changeRoundStatus, createAdminAccount, createEvent, createRound, deleteAdminAccount, drawRoundQuestion, generateRoundTickets, getAdminDashboard, getAdminRoundState, getCurrentUser, getSystemDiagnostics, importParticipants, issueParticipantCredential, listAdminAccounts, listAudit, listEventKeys, listEventParticipants, listEvents, listRoundQuestions, listRounds, logoutUser, recoverRound, regenerateAdminCredential, revealRoundDraw, reviewRoundClaim, setRoundPattern, type AdminAccount, type AdminDashboard, type AdminEvent, type AdminRound, type AdminRoundState, type AuditEntry, type EventKey, type EventParticipant, type ParticipantImportResult, type RoundQuestion } from '@/lib/api'
 import type { AuthMeResult } from '@/shared/types'
 import { createGame,listAccountGames,resumeAccountGame } from '@/lib/api'
+import { GameHeader } from '@/components/GameChrome'
+import { LogOut, Plus } from 'lucide-react'
 
 export default function Admin() {
   const navigate = useNavigate()
@@ -349,15 +351,15 @@ export default function Admin() {
 
   const role = account.principal.role ?? account.principal.type
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-6 px-4 py-8">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div><p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan">Technical Tambola</p><h1 className="mt-2 text-3xl font-black">Administration</h1></div>
-        <button className="btn btn-primary" disabled={adminBusy} onClick={async()=>{setAdminBusy(true);try{await createGame(account.user.name);navigate('/host')}catch(cause){setError(cause instanceof Error?cause.message:'Could not create game')}finally{setAdminBusy(false)}}}>Create a game</button>
-        <button className="btn" type="button" onClick={signOut} disabled={busy}>Sign out</button>
-      </header>
+    <main className="admin-workspace mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-8">
+      <GameHeader section={role.replaceAll('_', ' ')}><button className="btn" type="button" onClick={signOut} disabled={busy}><LogOut size={14} />Sign out</button></GameHeader>
+      <div className="flex flex-wrap items-end justify-between gap-5 pt-2"><div><p className="eyebrow text-cyan">Welcome back, {account.user.name}</p><h1 className="mt-2 text-4xl font-bold sm:text-5xl">Game control.</h1><p className="mt-2 text-sm text-slate-400">Set the pace. Keep the game moving.</p></div>
+        <button className="btn btn-primary" disabled={adminBusy} onClick={async()=>{setAdminBusy(true);try{await createGame(account.user.name);navigate('/host')}catch(cause){setError(cause instanceof Error?cause.message:'Could not create game')}finally{setAdminBusy(false)}}}><Plus size={16} />Create a game</button>
+      </div>
+      <nav className="admin-nav" aria-label="Administration sections"><a href="#games">Games</a><a href="#operations">Operations</a><a href="#audit">Audit trail</a><a href="#events">Events & rounds</a>{account.principal.type === 'SUPER_ADMIN' && <a href="#administrators">Administrators</a>}</nav>
       {error && <p role="alert" className="rounded-xl border border-rose/50 bg-rose/10 px-4 py-3 text-sm text-rose">{error}</p>}
-      <section className="card p-5"><h2 className="text-lg font-bold">Games</h2>{accountGames.length===0&&<p className="mt-2 text-sm text-slate-400">Create your first game and share its code with members.</p>}{accountGames.map(game=><div key={game.id} className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-edge p-3"><p><strong className="font-mono">{game.code}</strong><span className="ml-3 text-sm">{game.status}</span></p><button className="btn" disabled={adminBusy} onClick={async()=>{setAdminBusy(true);try{await resumeAccountGame(game.id);navigate('/host')}catch(cause){setError(cause instanceof Error?cause.message:'Could not restore game')}finally{setAdminBusy(false)}}}>Manage game</button></div>)}</section>
-      {account.principal.type !== 'PARTICIPANT' && <section className="card p-5">
+      <section id="games" className="card p-5"><h2 className="text-lg font-bold">Games</h2>{accountGames.length===0&&<p className="mt-2 text-sm text-slate-400">Create your first game and share its code with members.</p>}{accountGames.map(game=><div key={game.id} className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-edge p-3"><p><strong className="font-mono text-cyan">{game.code}</strong><span className="ml-3 text-sm">{game.status}</span></p><button className="btn" disabled={adminBusy} onClick={async()=>{setAdminBusy(true);try{await resumeAccountGame(game.id);navigate('/host')}catch(cause){setError(cause instanceof Error?cause.message:'Could not restore game')}finally{setAdminBusy(false)}}}>Manage game</button></div>)}</section>
+      {account.principal.type !== 'PARTICIPANT' && <section id="operations" className="card p-5">
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-bold">Operations dashboard</h2><button type="button" className="btn min-h-9 px-3 text-xs" onClick={async () => { try { setDashboard(await getAdminDashboard()); setDashboardError(null) } catch (cause) { setDashboardError(cause instanceof Error ? cause.message : 'Dashboard unavailable') } }}>Refresh</button></div>
         {dashboardError && <p role="alert" className="mt-3 text-sm text-rose">Dashboard unavailable: {dashboardError}</p>}
         {!dashboardError && dashboard && <>
@@ -370,7 +372,7 @@ export default function Admin() {
       {account.principal.type === 'SUPER_ADMIN' && system && <section className="card p-5"><h2 className="text-lg font-bold">System diagnostics</h2><dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">{[
         ['Application version', system.version ?? 'Unavailable'], ['Node runtime', system.nodeVersion], ['Readiness', system.readiness === null ? 'Unavailable' : system.readiness ? 'Ready' : 'Not ready'], ['Recovery required rounds', system.recoveryRequiredRounds ?? 'Unavailable'], ['Latest migration', system.latestMigration ?? 'Unavailable'],
       ].map(([label, value]) => <div key={String(label)}><dt className="text-slate-400">{label}</dt><dd>{value}</dd></div>)}</dl></section>}
-      {account.principal.type !== 'PARTICIPANT' && <section className="card p-5">
+      {account.principal.type !== 'PARTICIPANT' && <section id="audit" className="card p-5">
         <h2 className="text-lg font-bold">Audit trail</h2>
         <form className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" onSubmit={filterAudit}>
           <label className="text-xs">Action<input className="field mt-1 min-h-10" name="auditAction" defaultValue={auditAction} maxLength={100} placeholder="Exact action" /></label>
@@ -386,7 +388,7 @@ export default function Admin() {
         </article>)}{!auditEntries.length && <p className="py-3 text-sm text-slate-400">No matching audit entries.</p>}</div>
         {auditCursor && <button className="btn mt-3" type="button" onClick={loadMoreAudit} disabled={auditLoading}>{auditLoading ? 'Loading…' : 'Load more'}</button>}
       </section>}
-      {account.principal.type === 'SUPER_ADMIN' && <section className="card p-5">
+      {account.principal.type === 'SUPER_ADMIN' && <section id="administrators" className="card p-5">
         <h2 className="text-lg font-bold">Administrator accounts</h2>
         <p className="mt-1 text-sm text-slate-400">The account stays inactive until its temporary password is delivered to the administrator by email.</p>
         {adminError && <p role="alert" className="mt-3 rounded-lg border border-rose/50 bg-rose/10 p-3 text-sm text-rose">{adminError}</p>}
@@ -410,7 +412,7 @@ export default function Admin() {
           {admins.length === 0 && <p className="py-3 text-sm text-slate-400">No administrator accounts yet.</p>}
         </div>
       </section>}
-      {account.principal.type !== 'PARTICIPANT' && <section className="card p-5">
+      {account.principal.type !== 'PARTICIPANT' && <section id="events" className="card p-5">
         <h2 className="text-lg font-bold">Events and participants</h2>
         <p className="mt-1 text-sm text-slate-400">Create an event, then import a CSV with <code>name,email</code> headers and optional <code>external_id</code>.</p>
         {eventError && <p role="alert" className="mt-3 rounded-lg border border-rose/50 bg-rose/10 p-3 text-sm text-rose">{eventError}</p>}
