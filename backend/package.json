@@ -4,17 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev:demo": "tsx test/demo-server.ts",
     "dev": "tsx watch src/index.ts",
     "build": "tsc --noEmit && tsup",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts",
+    "test": "npm run build && tsx --test test/*.test.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:migrate:prod": "node dist/migrate.js",
     "db:status": "tsx src/db/migrate.ts --status",
     "test:browser": "tsx test/browser-server.ts"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.2.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
@@ -26,14 +28,15 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.0",
+    "@types/cookie": "^0.6.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.2",
+    "@types/node": "^22.10.7",
     "@types/pg": "^8.15.0",
     "socket.io-client": "^4.8.1",
     "tsup": "^8.5.0",
     "tsx": "^4.19.4",
-    "typescript": "^5.7.3",
-    "@types/node": "^22.10.7"
+    "typescript": "^5.7.3"
   },
   "engines": {
     "node": ">=22.12.0"

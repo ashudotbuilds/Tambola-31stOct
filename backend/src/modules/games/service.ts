@@ -7,11 +7,12 @@ import { ensure } from '../../errors'
 import { findGame, findPlayer, findTicket, gameCode, newToken, requireHost, tokenHash } from './repository'
 import type { GameRecord, PlayerRecord } from './models'
 import { generateTicket } from './ticket'
+import { recordAudit } from '../auth/repository'
 
 export class GameService {
   constructor(readonly db: Database) {}
 
-  async create(hostName: string, bank: TechnicalItem[] = DEFAULT_TECHNICAL_BANK) {
+  async create(hostName: string, bank: TechnicalItem[] = DEFAULT_TECHNICAL_BANK, accountId?: string) {
     const hostToken = newToken()
     const playerToken = newToken()
     const settings: Settings = {
@@ -30,19 +31,43 @@ export class GameService {
         game = rows[0]
       }
       ensure(game, 503, 'Could not allocate a game code, please retry')
+      if (accountId) await db.query('UPDATE games SET account_user_id=$2 WHERE id=$1', [game.id, accountId])
       const { rows: [host] } = await db.query<PlayerRecord>(
         'INSERT INTO game_players (game_id, token_hash, display_name, is_host) VALUES ($1,$2,$3,true) RETURNING *',
         [game.id, tokenHash(playerToken), hostName],
       )
+      if (accountId) await db.query('UPDATE game_players SET account_user_id=$2 WHERE id=$1', [host.id, accountId])
+      await recordAudit(db,{actorId:accountId,action:'GAME_CREATED',resourceType:'game',resourceId:game.id})
       return { ok: true as const, game_id: game.id, code: game.code, status: game.status, settings,
         player_id: host.id, display_name: host.display_name, player_token: playerToken, host_token: hostToken }
     })
   }
 
-  async join(code: string, name: string) {
+  async resumeAccount(gameId: string, accountId: string, superAdmin: boolean) {
+    return this.db.transaction(async db => {
+      const game = await findGame(db,gameId,true)
+      ensure(superAdmin || game.account_user_id === accountId,403,'Only the game administrator can manage this game')
+      const hostToken=newToken(),playerToken=newToken()
+      await db.query('UPDATE games SET host_token_hash=$2 WHERE id=$1',[gameId,tokenHash(hostToken)])
+      const {rows:[host]}=await db.query<PlayerRecord>('UPDATE game_players SET token_hash=$2 WHERE game_id=$1 AND is_host RETURNING *',[gameId,tokenHash(playerToken)])
+      ensure(host,404,'Game host not found')
+      await recordAudit(db,{actorId:accountId,action:'GAME_SESSION_RESTORED',resourceType:'game',resourceId:gameId})
+      return {ok:true as const,game_id:game.id,code:game.code,status:game.status,settings:game.settings,player_id:host.id,display_name:host.display_name,player_token:playerToken,host_token:hostToken}
+    })
+  }
+
+  async join(code: string, name: string, accountId?: string) {
     return this.db.transaction(async db => {
       const { rows: [game] } = await db.query<GameRecord>('SELECT * FROM games WHERE code = $1 FOR UPDATE', [code])
       ensure(game, 404, 'No game found with that code')
+      if (accountId) {
+        const { rows: [existing] } = await db.query<PlayerRecord>('SELECT * FROM game_players WHERE game_id=$1 AND account_user_id=$2 AND NOT is_host', [game.id, accountId])
+        if (existing) {
+          const token = newToken()
+          await db.query('UPDATE game_players SET token_hash=$2 WHERE id=$1', [existing.id, tokenHash(token)])
+          return { ok: true as const, game_id: game.id, code: game.code, status: game.status, settings: game.settings, player_id: existing.id, display_name: existing.display_name, player_token: token }
+        }
+      }
       ensure(game.status === 'lobby', 409, 'That game has already started')
       const { rows: [{ count }] } = await db.query<{ count: number }>(
         'SELECT count(*)::int AS count FROM game_players WHERE game_id = $1', [game.id],
@@ -55,7 +80,9 @@ export class GameService {
         'INSERT INTO game_players (game_id, token_hash, display_name) VALUES ($1,$2,$3) RETURNING *',
         [game.id, tokenHash(token), name],
       )
+      if (accountId) await db.query('UPDATE game_players SET account_user_id=$2 WHERE id=$1', [player.id, accountId])
       await db.query('INSERT INTO tickets (game_id, player_id, cells) VALUES ($1,$2,$3)', [game.id, player.id, JSON.stringify(generateTicket())])
+      await recordAudit(db,{actorId:accountId,action:'GAME_JOINED',resourceType:'game',resourceId:game.id})
       return { ok: true as const, game_id: game.id, code: game.code, status: game.status, settings: game.settings,
         player_id: player.id, display_name: player.display_name, player_token: token, player_count: count + 1 }
     })
@@ -100,6 +127,7 @@ export class GameService {
       const { rows } = await db.query('SELECT id FROM game_players WHERE game_id = $1 AND NOT is_host LIMIT 1', [gameId])
       ensure(rows.length, 409, 'At least one player must join first')
       await db.query("UPDATE games SET status = 'playing', started_at = now() WHERE id = $1", [gameId])
+      await recordAudit(db,{actorId:game.account_user_id,action:'GAME_STARTED',resourceType:'game',resourceId:gameId})
       return { ok: true, status: 'playing' }
     })
   }
@@ -121,6 +149,7 @@ export class GameService {
         ensure(!['lobby', 'finished'].includes(game.status), 409, 'Game is not in progress')
       }
       await db.query("UPDATE games SET status = $2, paused_from_status = $3, finished_at = CASE WHEN $2 = 'finished' THEN now() ELSE finished_at END WHERE id = $1", [gameId, status, pausedFrom])
+      await recordAudit(db,{actorId:game.account_user_id,action:'GAME_STATUS_CHANGED',resourceType:'game',resourceId:gameId,metadata:{status}})
       return { ok: true, status }
     })
   }
@@ -144,6 +173,7 @@ export class GameService {
       const finished = game.status === 'closing' && closing !== undefined && seq - closing >= (game.settings.close_after_calls ?? 10)
       const status = finished ? 'finished' : game.status
       await db.query("UPDATE games SET next_seq = next_seq + 1, status = $2, finished_at = CASE WHEN $2 = 'finished' THEN now() ELSE finished_at END WHERE id = $1", [gameId, status])
+      await recordAudit(db,{actorId:game.account_user_id,action:'GAME_DRAW',resourceType:'game',resourceId:gameId,metadata:{seq}})
       return { ok: true as const, seq, number, clue, status, called_count: called.size + 1 }
     })
   }
@@ -153,8 +183,11 @@ export class GameService {
       const game = await findGame(db, gameId, true)
       requireHost(game, token)
       ensure(seqs.every(seq => seq < game.next_seq), 400, 'Cannot reveal a call that does not exist')
-      const revealed = [...new Set(seqs)].sort((a, b) => a - b)
+      // Concurrent host tabs may send an older snapshot. A reveal is permanent:
+      // merge under the game lock so one request cannot hide another's answers.
+      const revealed = [...new Set([...(game.settings.revealed_seqs ?? []), ...seqs])].sort((a, b) => a - b)
       await db.query("UPDATE games SET settings = jsonb_set(settings, '{revealed_seqs}', $2::jsonb) WHERE id = $1", [gameId, JSON.stringify(revealed)])
+      await recordAudit(db, { actorId: game.account_user_id, action: 'GAME_ANSWERS_REVEALED', resourceType: 'game', resourceId: gameId, metadata: { total: revealed.length } })
       return { ok: true, revealed_seqs: revealed }
     })
   }
@@ -164,6 +197,7 @@ export class GameService {
       const game = await findGame(db, gameId, true)
       requireHost(game, token)
       await db.query("UPDATE games SET settings = jsonb_set(settings, '{custom_bank}', $2::jsonb) WHERE id = $1", [gameId, JSON.stringify(bank)])
+      await recordAudit(db, { actorId: game.account_user_id, action: 'GAME_BANK_UPDATED', resourceType: 'game', resourceId: gameId, metadata: { total: bank.length } })
       return { ok: true }
     })
   }

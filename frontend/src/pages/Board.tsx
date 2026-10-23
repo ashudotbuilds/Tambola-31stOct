@@ -56,6 +56,7 @@ function Board() {
   )
 
   const isCallRevealed = call ? revealedSeqs.has(call.seq) : false
+  const revealedNumbers = new Set((state?.calls ?? []).filter(c => revealedSeqs.has(c.seq)).map(c => c.number))
 
   if (loadError) {
     return (
@@ -123,7 +124,7 @@ function Board() {
                   key={n}
                   className={[
                     'flex aspect-square items-center justify-center rounded-lg border text-xs font-bold tabular-nums sm:text-sm',
-                    called.has(n) ? 'border-cyan/70 bg-cyan/20 text-cyan shadow-sm' : 'border-edge/70 bg-ink/40 text-slate-600',
+                    revealedNumbers.has(n) ? 'border-cyan/70 bg-cyan/20 text-cyan shadow-sm' : 'border-edge/70 bg-ink/40 text-slate-600',
                   ].join(' ')}
                 >
                   {n}
@@ -132,7 +133,7 @@ function Board() {
             </div>
           ) : (
             <div className="flex flex-wrap gap-2 max-h-[45vh] overflow-y-auto pr-1">
-              {Array.from(called).map((n) => {
+              {Array.from(revealedNumbers).map((n) => {
                 const item = getTechnicalItem(n, customBank)
                 const isLatest = call?.number === n
                 return (
@@ -149,8 +150,8 @@ function Board() {
                   </div>
                 )
               })}
-              {called.size === 0 && (
-                <p className="text-sm text-slate-500 italic">No technical items called yet.</p>
+              {revealedNumbers.size === 0 && (
+                <p className="text-sm text-slate-500 italic">No answers revealed yet.</p>
               )}
             </div>
           )}

@@ -120,7 +120,7 @@ export default function PlayerScreen() {
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-4 text-center">
         <h1 className="text-2xl font-bold">No ticket on this device</h1>
         <p className="text-sm text-slate-400">Join a game first, then come back to your ticket.</p>
-        <Link to="/" className="btn btn-primary">
+        <Link to="/account" className="btn btn-primary">
           Join a game
         </Link>
       </main>
@@ -307,6 +307,27 @@ export default function PlayerScreen() {
               )
             })}
           </div>
+        </details>
+      )}
+
+      {(state?.calls.length ?? 0) > 0 && (
+        <details className="card p-3 sm:p-4">
+          <summary className="cursor-pointer py-2 text-sm font-bold text-cyan">
+            Question and answer history ({revealedSeqs.size} revealed)
+          </summary>
+          <ol className="mt-2 max-h-80 space-y-2 overflow-y-auto" aria-label="Question and answer history">
+            {[...(state?.calls ?? [])].reverse().map((previous) => {
+              const item = getTechnicalItem(previous.number, customBank)
+              return <li key={previous.seq} className="rounded-lg border border-edge p-3 text-sm">
+                <p className="font-mono text-xs text-cyan">Call #{previous.seq}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words">{previous.clue}</p>
+                {item.codeSnippet && <pre className="mt-2 overflow-x-auto rounded bg-black/80 p-2 text-xs text-lime">{item.codeSnippet}</pre>}
+                {revealedSeqs.has(previous.seq)
+                  ? <p className="mt-2 break-words font-bold text-cyan">Answer: {item.term} (#{previous.number})</p>
+                  : <p className="mt-2 text-xs text-slate-400">Answer waiting for host reveal</p>}
+              </li>
+            })}
+          </ol>
         </details>
       )}
 

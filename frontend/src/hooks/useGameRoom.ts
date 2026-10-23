@@ -69,7 +69,7 @@ export function useGameRoom(gameId: string | null, token: string | null | undefi
     setConnected(0)
     if (!gameId) return
     void load()
-    const socket = io(API_URL, { auth: { gameId, ...(token ? { token } : {}) } })
+    const socket = io(API_URL, { withCredentials: true, auth: { gameId, ...(token ? { token } : {}) } })
     socket.on('connect', () => setConnection('connecting'))
     socket.on('room_ready', () => { setConnection('live'); void load() })
     socket.on('disconnect', () => setConnection('offline'))

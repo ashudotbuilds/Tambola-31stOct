@@ -86,21 +86,21 @@ export function Ticket({
           <button
             type="button"
             onClick={() => scrollToBand(0)}
-            className="px-2 py-0.5 rounded bg-ink/20 dark:bg-panel border border-edge/60 text-[10px] font-bold hover:text-cyan"
+            className="min-h-11 min-w-11 px-2 py-0.5 rounded bg-ink/20 dark:bg-panel border border-edge/60 text-[10px] font-bold hover:text-cyan"
           >
             1–3
           </button>
           <button
             type="button"
             onClick={() => scrollToBand(3)}
-            className="px-2 py-0.5 rounded bg-ink/20 dark:bg-panel border border-edge/60 text-[10px] font-bold hover:text-cyan"
+            className="min-h-11 min-w-11 px-2 py-0.5 rounded bg-ink/20 dark:bg-panel border border-edge/60 text-[10px] font-bold hover:text-cyan"
           >
             4–6
           </button>
           <button
             type="button"
             onClick={() => scrollToBand(6)}
-            className="px-2 py-0.5 rounded bg-ink/20 dark:bg-panel border border-edge/60 text-[10px] font-bold hover:text-cyan"
+            className="min-h-11 min-w-11 px-2 py-0.5 rounded bg-ink/20 dark:bg-panel border border-edge/60 text-[10px] font-bold hover:text-cyan"
           >
             7–9
           </button>
@@ -111,7 +111,7 @@ export function Ticket({
           <button
             type="button"
             onClick={() => setMobileFit((prev) => !prev)}
-            className="sm:hidden text-[10px] font-semibold text-cyan hover:underline"
+            className="sm:hidden min-h-11 px-2 text-[10px] font-semibold text-cyan hover:underline"
           >
             {mobileFit ? '↔ Swipe View' : '⤢ Fit Screen'}
           </button>
@@ -177,6 +177,7 @@ export function Ticket({
                   role={onToggleCell ? 'button' : undefined}
                   tabIndex={onToggleCell && !isCut ? 0 : undefined}
                   aria-pressed={isSelected}
+                  aria-disabled={onToggleCell ? isCut : undefined}
                   onClick={() => {
                     setInspectCell(cell)
                     if (!isCut && onToggleCell) {
@@ -191,7 +192,7 @@ export function Ticket({
                     }
                   }}
                   className={[
-                    'cell group relative overflow-hidden transition-all duration-150 min-h-[58px] sm:min-h-[72px] md:min-h-[78px]',
+                    'cell group relative overflow-hidden transition-all duration-150 min-h-[58px] sm:min-h-[72px] md:min-h-[78px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan',
                     cellStyle,
                     isLatest ? 'animate-pop ring-2 ring-cyan' : '',
                     onToggleCell && !isCut ? 'cursor-pointer active:scale-95' : '',

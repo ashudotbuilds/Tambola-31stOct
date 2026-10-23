@@ -86,6 +86,8 @@ export default function Landing() {
         </p>
       </header>
 
+      <div className="text-center"><Link to="/login" className="text-sm font-semibold text-cyan hover:underline">Administrator or participant sign in</Link></div>
+
       {!configured ? (
         <div className="card border-rose/60 bg-rose/10 p-4 text-sm text-rose">
           The game server address is invalid. Please contact the host.

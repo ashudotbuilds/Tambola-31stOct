@@ -15,6 +15,7 @@ backend/.env.*
 !backend/.env.example
 .playwright/
 test-results/
+artifacts/audit/
 coverage/
 
 .insforge/

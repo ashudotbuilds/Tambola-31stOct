@@ -251,7 +251,7 @@ export default function HostScreen() {
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-4 text-center">
         <h1 className="text-2xl font-bold">No game on this device</h1>
         <p className="text-sm text-slate-400">Create a game first, then come back to the host screen.</p>
-        <Link to="/" className="btn btn-primary">
+        <Link to="/admin" className="btn btn-primary">
           Create a game
         </Link>
       </main>
@@ -266,7 +266,7 @@ export default function HostScreen() {
       {/* Header */}
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link to="/" className="text-sm font-black tracking-tight text-slate-500 hover:text-cyan">
+          <Link to="/admin" className="text-sm font-black tracking-tight text-slate-500 hover:text-cyan">
             ←
           </Link>
           <div>
@@ -355,8 +355,8 @@ export default function HostScreen() {
         </section>
       ) : (
         <>
-          <section className="grid gap-4 lg:grid-cols-[1fr_340px]">
-            <div className="flex flex-col gap-4">
+          <section className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="flex min-w-0 flex-col gap-4">
               {/* Main Clue Stage with Question & Answer preview */}
               <ClueStage
                 call={room.lastCall}

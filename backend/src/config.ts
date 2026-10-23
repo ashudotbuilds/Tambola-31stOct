@@ -14,6 +14,10 @@ const schema = z.object({
   WEB_ORIGINS: z.string().default('http://localhost:5173'),
   DATABASE_POOL_MAX: z.coerce.number().int().positive().max(50).default(10),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
+  SUPER_ADMIN_BOOTSTRAP_SECRET: z.string().min(32).optional(),
+  EMAIL_API_URL: z.string().url().optional(),
+  EMAIL_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.string().email().optional(),
 })
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {
@@ -26,6 +30,8 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
   if (!origins.length || origins.some(origin => {
     try { return new URL(origin).origin !== origin } catch { return true }
   })) throw new Error('WEB_ORIGINS must contain exact URL origins without trailing slashes')
+  const emailValues = [result.data.EMAIL_API_URL, result.data.EMAIL_API_KEY, result.data.EMAIL_FROM]
+  if (emailValues.some(Boolean) && !emailValues.every(Boolean)) throw new Error('EMAIL_API_URL, EMAIL_API_KEY, and EMAIL_FROM must be set together')
   return { ...result.data, origins }
 }
 

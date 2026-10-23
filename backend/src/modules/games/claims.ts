@@ -4,6 +4,7 @@ import type { ClaimResult, ClaimType } from '../../shared/types'
 import type { Database } from '../../db/database'
 import { ensure } from '../../errors'
 import { findGame, findPlayer, findTicket } from './repository'
+import { recordAudit } from '../auth/repository'
 
 export class ClaimService {
   constructor(private db: Database) {}
@@ -36,6 +37,7 @@ export class ClaimService {
           'UPDATE game_players SET score = greatest(0, score - $2), wrong_claims = wrong_claims + 1 WHERE id = $1 RETURNING score, wrong_claims', [player.id, penalty],
         )
         await db.query("INSERT INTO claims (game_id, player_id, claim_type, status, points, reason) VALUES ($1,$2,$3,'rejected',$4,$5)", [gameId, player.id, claim, -penalty, 'Not valid on your ticket'])
+        await recordAudit(db, { actorId: player.account_user_id, action: 'GAME_CLAIM_REJECTED', resourceType: 'game', resourceId: gameId, metadata: { pattern: claim, status: 'rejected' } })
         return { ok: true, accepted: false, status: 'rejected', reason: 'Not valid on your ticket', points: -penalty,
           penalty, cut, score: updated.score, wrong_claims: updated.wrong_claims }
       }
@@ -48,6 +50,7 @@ export class ClaimService {
       } else if (claim === 'second_full_house') {
         await db.query("UPDATE games SET status = 'finished', finished_at = now() WHERE id = $1", [gameId])
       }
+      await recordAudit(db, { actorId: player.account_user_id, action: 'GAME_CLAIM_ACCEPTED', resourceType: 'game', resourceId: gameId, metadata: { pattern: claim, status: 'accepted' } })
       return { ok: true, accepted: true, status: 'accepted', reason: null, points, score: updated.score }
     })
   }

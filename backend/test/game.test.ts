@@ -7,16 +7,29 @@ import { testDatabase } from './helpers'
 import type { Database } from '../src/db/database'
 import { runMigrations } from '../src/db/migrations'
 import { DEFAULT_TECHNICAL_BANK } from '../src/shared/bank'
+import { createUser,createAdminProfile } from '../src/modules/auth/repository'
+import { hashPassword } from '../src/modules/auth/password'
 import type { CreateGameResult, JoinGameResult, GameState, ClaimResult, DrawResult } from '../src/shared/types'
 
 let db: Database
 let application: ReturnType<typeof createApplication>
 let base: string
+let adminCookie:string
+let participantEvent:string
+let passwordHash:string
+let nextAccount=0
+const tokenCookies=new Map<string,string>()
 const migrationDir = fileURLToPath(new URL('../migrations/', import.meta.url))
 before(async () => {
   db = await testDatabase()
   await runMigrations(db, migrationDir)
   application = createApplication(db, { origins: ['http://localhost:5173'] })
+  passwordHash=await hashPassword('TestPassword123!')
+  const root=await createUser(db,'root@test.local',passwordHash,'Host')
+  await createAdminProfile(db,root.id,'SUPER_ADMIN')
+  adminCookie=`tt_session=${(await application.auth.login(root.email,'TestPassword123!')).token}`
+  const {rows:[fixtureEvent]}=await db.query<{id:string}>("INSERT INTO events(name) VALUES ('Game test') RETURNING id")
+  participantEvent=fixtureEvent.id
   await new Promise<void>(resolve => application.server.listen(0, '127.0.0.1', resolve))
   const address = application.server.address()
   assert.ok(address && typeof address !== 'string')
@@ -28,25 +41,67 @@ after(async () => {
 })
 
 async function api<T>(path: string, method = 'GET', body?: unknown, token?: string, expected = 200): Promise<T> {
+  let cookie=tokenCookies.get(token??'')??adminCookie
+  if(path==='/api/games/join'){
+    const name=(body as {name:string}).name
+    const user=await createUser(db,`member${++nextAccount}@test.local`,passwordHash,name)
+    await db.query('INSERT INTO participant_profiles(user_id,event_id) VALUES ($1,$2)',[user.id,participantEvent])
+    cookie=`tt_session=${(await application.auth.login(user.email,'TestPassword123!')).token}`
+  }
   const response = await fetch(`${base}${path}`, { method,
-    headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: {Cookie:cookie,Origin:'http://localhost:5173', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   const result = await response.json()
+  const issued=result as {player_token?:string;host_token?:string}
+  if(issued.player_token)tokenCookies.set(issued.player_token,cookie)
+  if(issued.host_token)tokenCookies.set(issued.host_token,cookie)
   assert.equal(response.status, expected, JSON.stringify(result))
   return result as T
 }
 const create = () => api<CreateGameResult>('/api/games', 'POST', { hostName: 'Host' }, undefined, 201)
 const join = (code: string, name: string) => api<JoinGameResult>('/api/games/join', 'POST', { code, name }, undefined, 201)
+
+test('batch reveals survive stale host requests and are audited without private data', async () => {
+  const host = await create()
+  const players = await Promise.all(['Reveal A', 'Reveal B', 'Reveal C'].map(name => join(host.code, name)))
+  await api(`/api/games/${host.game_id}/start`, 'POST', undefined, host.host_token)
+  for (let i = 0; i < 4; i++) await api(`/api/games/${host.game_id}/calls`, 'POST', undefined, host.host_token)
+  await Promise.all([
+    api(`/api/games/${host.game_id}/reveals`, 'PUT', { seqs: [1, 2] }, host.host_token),
+    api(`/api/games/${host.game_id}/reveals`, 'PUT', { seqs: [3, 4] }, host.host_token),
+  ])
+  await api(`/api/games/${host.game_id}/reveals`, 'PUT', { seqs: [] }, host.host_token)
+  for (const player of players) {
+    const state = await api<GameState>(`/api/games/${host.game_id}`, 'GET', undefined, player.player_token)
+    assert.deepEqual(state.settings.revealed_seqs, [1, 2, 3, 4])
+    assert.deepEqual(state.me!.marked, [], 'A reveal never marks a ticket')
+  }
+  await api(`/api/games/${host.game_id}/reveals`, 'PUT', { seqs: [5] }, host.host_token, 400)
+  await api(`/api/games/${host.game_id}/bank`, 'PUT', { bank: DEFAULT_TECHNICAL_BANK }, host.host_token)
+  await api(`/api/games/${host.game_id}/claims`, 'POST', { claim: 'early_five' }, players[0].player_token)
+  const audit = await api<{ entries: { action: string; metadata: unknown; actorId: string | null }[] }>('/api/v1/admin/audit?limit=100')
+  const serialized = JSON.stringify(audit)
+  for (const token of [host.host_token, ...players.map(player => player.player_token)]) assert.ok(!serialized.includes(token))
+  assert.ok(audit.entries.some(entry => entry.action === 'GAME_ANSWERS_REVEALED' && entry.actorId))
+  assert.ok(audit.entries.some(entry => entry.action === 'GAME_BANK_UPDATED'))
+  assert.ok(audit.entries.some(entry => entry.action === 'GAME_CLAIM_REJECTED' && entry.actorId))
+})
 const event = <T>(socket: Socket, name: string) => new Promise<T>((resolve, reject) => {
   const timeout = setTimeout(() => reject(new Error(`Missing ${name} event`)), 5000)
   socket.once(name, value => { clearTimeout(timeout); resolve(value as T) })
 })
 
 test('migration application is repeatable and tracked', async () => {
-  assert.deepEqual(await runMigrations(db, migrationDir), ['applied 001_initial.sql'])
+  assert.deepEqual(await runMigrations(db, migrationDir), [
+    'applied 001_initial.sql', 'applied 002_auth.sql', 'applied 003_event_participants.sql',
+    'applied 004_round_content_tickets.sql', 'applied 005_idempotency.sql',
+    'applied 006_credential_delivery.sql', 'applied 007_admin_credential_delivery.sql',
+    'applied 008_round_recovery.sql',
+    'applied 009_game_accounts.sql', 'applied 010_login_ids.sql',
+  ])
   const { rows } = await db.query<{ count: number }>('SELECT count(*)::int AS count FROM schema_migrations')
-  assert.equal(rows[0].count, 1)
+  assert.equal(rows[0].count, 10)
 })
 
 test('HTTP: sessions, privacy, authorization, custom bank, join validation and lifecycle', async () => {
@@ -155,8 +210,8 @@ test('closing ends ten calls after full house; draws exhaust at 90 without dupli
 test('Socket.IO: room readiness, presence, committed updates, reconnect, and isolation', async () => {
   const host = await create()
   const other = await create()
-  const socket = connect(base, { autoConnect: false, auth: { gameId: host.game_id, token: host.player_token } })
-  const foreign = connect(base, { autoConnect: false, auth: { gameId: other.game_id } })
+  const socket = connect(base, { autoConnect: false, extraHeaders: { Cookie: adminCookie }, auth: { gameId: host.game_id, token: host.player_token } })
+  const foreign = connect(base, { autoConnect: false, extraHeaders: { Cookie: adminCookie }, auth: { gameId: other.game_id } })
   try {
     const ready = event(socket, 'room_ready'); socket.connect(); await ready
     const foreignReady = event(foreign, 'room_ready'); foreign.connect(); await foreignReady
@@ -171,16 +226,35 @@ test('Socket.IO: room readiness, presence, committed updates, reconnect, and iso
     assert.equal((await application.games.state(host.game_id)).status, 'lobby')
     socket.disconnect()
     const reconnected = event(socket, 'room_ready'); socket.connect(); await reconnected
-    const projector = connect(base, { autoConnect: false, auth: { gameId: host.game_id } })
+    const projector = connect(base, { autoConnect: false, extraHeaders: { Cookie: adminCookie }, auth: { gameId: host.game_id } })
     try {
       const count = event<number>(socket, 'presence')
       const readyProjector = event(projector, 'room_ready'); projector.connect(); await readyProjector
       assert.equal(await count, 2)
     } finally { projector.disconnect() }
-    const invalid = connect(base, { autoConnect: false, reconnection: false, auth: { gameId: host.game_id, token: 'f'.repeat(64) } })
+    const invalid = connect(base, { autoConnect: false, extraHeaders: { Cookie: adminCookie }, reconnection: false, auth: { gameId: host.game_id, token: 'f'.repeat(64) } })
     try {
       const failure = event<Error>(invalid, 'connect_error'); invalid.connect(); await failure
       assert.equal(invalid.connected, false)
     } finally { invalid.disconnect() }
   } finally { socket.disconnect(); foreign.disconnect() }
+})
+
+test('Game API requires an account and denies member game creation', async () => {
+  assert.equal((await fetch(`${base}/api/games`)).status,401)
+  const host=await create()
+  const member=await join(host.code,'Role check member')
+  await api('/api/games','POST',{hostName:'Pretend admin'},member.player_token,403)
+})
+
+test('Admins can list and restore their games; members cannot restore a host session', async () => {
+  const host=await create()
+  const member=await join(host.code,'Restore member')
+  const games=await api<{games:Array<{id:string}>}>('/api/games')
+  assert.ok(games.games.some(game=>game.id===host.game_id))
+  await api(`/api/games/${host.game_id}/session`,'POST',{},member.player_token,403)
+  const restored=await api<CreateGameResult>(`/api/games/${host.game_id}/session`,'POST',{})
+  assert.notEqual(restored.host_token,host.host_token)
+  await api(`/api/games/${host.game_id}/start`,'POST',undefined,host.host_token,403)
+  await api(`/api/games/${host.game_id}/start`,'POST',undefined,restored.host_token)
 })

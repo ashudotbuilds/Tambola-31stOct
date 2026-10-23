@@ -4,6 +4,7 @@ import type { GameService } from './service'
 import type { ClaimService } from './claims'
 import { ensure } from '../../errors'
 import * as validate from './validation'
+import { requireRole } from '../auth/middleware'
 
 function bearer(req: Request, required = true): string | undefined {
   const authorization = req.header('authorization')
@@ -21,21 +22,53 @@ export function gameRoutes(games: GameService, claims: ClaimService, changed: (g
   const entryLimit = rateLimit({ windowMs: 60_000, limit: 150, standardHeaders: 'draft-7', legacyHeaders: false,
     message: { ok: false, error: 'Too many requests. Please wait a minute.' } })
 
-  router.post('/', entryLimit, async (req, res) => {
+  router.post('/', entryLimit, requireRole(['ADMIN']), async (req, res) => {
     const { hostName, bank } = validate.createBody.parse(req.body)
-    res.status(201).json(await games.create(hostName, bank))
+    res.status(201).json(await games.create(req.auth!.user.name.slice(0,24), bank, req.auth!.user.id))
   })
-  router.post('/join', entryLimit, async (req, res) => {
+  router.post('/join', entryLimit, requireRole(['PARTICIPANT']), async (req, res) => {
     const { code, name } = validate.joinBody.parse(req.body)
-    const result = await games.join(code, name)
+    const result = await games.join(code, req.auth!.user.name.slice(0,24), req.auth!.user.id)
     changed(result.game_id)
     res.status(201).json(result)
   })
   router.get('/code/:code', async (req, res) => {
     res.json(await games.stateByCode(validate.code.parse(req.params.code)))
   })
+  router.get('/', requireRole(['ADMIN']), async(req,res)=>{
+    const {rows}=await games.db.query('SELECT id,code,status,created_at FROM games WHERE account_user_id=$1 OR $2 ORDER BY created_at DESC LIMIT 100',[req.auth!.user.id,req.auth!.principal.type==='SUPER_ADMIN'])
+    res.json({ok:true,games:rows})
+  })
+  router.post('/:id/session',requireRole(['ADMIN']),async(req,res)=>{
+    res.json(await games.resumeAccount(validate.uuid.parse(req.params.id),req.auth!.user.id,req.auth!.principal.type==='SUPER_ADMIN'))
+  })
   router.param('id', (req, _res, next, value) => {
     try { validate.uuid.parse(value); next() } catch (error) { next(error) }
+  })
+  router.use('/:id', async (req, _res, next) => {
+    try {
+      const id = String(req.params.id)
+      const actor = req.auth!
+      const token = bearer(req, false)
+      if (actor.principal.type === 'PARTICIPANT') {
+        const { rows } = await games.db.query('SELECT id FROM game_players WHERE game_id=$1 AND account_user_id=$2 AND NOT is_host', [id, actor.user.id])
+        ensure(rows.length, 403, 'Join this game with your account first')
+      }
+      if (req.method !== 'GET') {
+        const playerAction = /\/(marks|claims)$/.test(req.path)
+        ensure(playerAction ? actor.principal.type === 'PARTICIPANT' : actor.principal.type !== 'PARTICIPANT', 403, 'This action is not available for your role')
+        if (!playerAction) {
+          const { rows } = await games.db.query('SELECT id FROM games WHERE id=$1 AND account_user_id=$2', [id, actor.user.id])
+          ensure(rows.length || actor.principal.type === 'SUPER_ADMIN', 403, 'Only the game administrator can manage this game')
+        }
+      }
+      if (token && actor.principal.type === 'PARTICIPANT') {
+        const state = await games.state(id, token)
+        const { rows } = await games.db.query('SELECT id FROM game_players WHERE id=$1 AND account_user_id=$2', [state.me?.player_id, actor.user.id])
+        ensure(rows.length, 403, 'Game session belongs to another account')
+      }
+      next()
+    } catch (error) { next(error) }
   })
   router.get('/:id', async (req, res) => {
     res.json(await games.state(String(req.params.id), bearer(req, false)))

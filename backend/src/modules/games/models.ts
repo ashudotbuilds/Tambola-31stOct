@@ -1,6 +1,7 @@
 import type { ClaimType, GameStatus, Settings, Ticket } from '../../shared/types'
 
 export interface GameRecord {
+  account_user_id?: string
   id: string
   code: string
   status: GameStatus
@@ -12,6 +13,7 @@ export interface GameRecord {
 }
 
 export interface PlayerRecord {
+  account_user_id?: string | null
   id: string
   game_id: string
   display_name: string

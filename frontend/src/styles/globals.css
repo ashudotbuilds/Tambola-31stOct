@@ -69,7 +69,7 @@ html.light body {
 
   .field {
     @apply w-full rounded-xl border border-edge bg-ink/80 px-4 py-3 text-base text-slate-100
-           placeholder:text-slate-500 focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan;
+           placeholder:text-slate-500 focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan focus-visible:ring-2 focus-visible:ring-cyan;
   }
 
   html.light .field {
@@ -83,6 +83,40 @@ html.light body {
   html.light .label {
     @apply text-slate-500;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Keep muted copy and accent text readable against light surfaces. */
+html.light .text-slate-400 {
+  color: #475569;
+}
+
+html.light .text-slate-300 {
+  color: #475569;
+}
+
+html.light .round-ticket-cell {
+  @apply border-slate-300 bg-slate-100 text-slate-800;
+}
+
+html.light .round-ticket-cell[aria-pressed="true"] {
+  @apply border-cyan bg-cyan/15 text-slate-900;
+}
+
+html.light .round-ticket-cell[data-cut="true"] {
+  @apply border-red-300 bg-red-50 text-red-700;
+}
+
+html.light [class~="text-cyan"] {
+  color: #0e7490;
 }
 
 /* A ticket cell that can display technical terms, outputs, or numbers */

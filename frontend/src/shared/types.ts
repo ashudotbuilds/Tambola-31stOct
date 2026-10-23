@@ -184,3 +184,34 @@ export interface TicketUpdatedEvent {
   game_id: string
   player_id: string
 }
+
+/* Production Auth & Role types (PRD §5, §11, §39) */
+export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
+export type AdminRole = 'ADMIN' | 'SUPER_ADMIN'
+export type PrincipalType = 'PARTICIPANT' | 'ADMIN' | 'SUPER_ADMIN'
+
+export interface AuthUser {
+  id: string
+  email: string
+  name: string
+  status: UserStatus
+}
+
+export interface AuthPrincipal {
+  type: PrincipalType
+  profileId: string
+  role?: AdminRole
+  eventId?: string
+}
+
+export interface LoginResult {
+  ok: true
+  user: AuthUser
+  principal: AuthPrincipal
+}
+
+export interface AuthMeResult {
+  ok: true
+  user: AuthUser
+  principal: AuthPrincipal
+}
