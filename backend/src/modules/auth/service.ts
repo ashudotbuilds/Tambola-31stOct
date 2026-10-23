@@ -130,7 +130,6 @@ export class AuthService {
       principal = {
         type: 'PARTICIPANT',
         profileId: participant.id,
-        eventId: participant.event_id,
       }
     }
 
@@ -190,7 +189,6 @@ export class AuthService {
       principal = {
         type: 'PARTICIPANT',
         profileId: active.participantProfile.id,
-        eventId: active.participantProfile.event_id,
       }
     } else {
       throw new AppError(403, 'Associated profile is no longer active')

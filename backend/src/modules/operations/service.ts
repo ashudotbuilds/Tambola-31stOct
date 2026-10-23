@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import type { Database } from '../../db/database'
 import { AppError } from '../../errors'
-import type { AuthContext } from '../auth/models'
 
 interface Cursor { createdAt: string; id: string }
 const cursorSchema = z.object({ createdAt: z.string().datetime({ offset: true }), id: z.string().uuid() }).strict()
@@ -32,34 +31,16 @@ export class OperationsService {
   constructor(readonly db: Database) {}
 
   async dashboard(socketConnections: number) {
-    return this.db.transaction(async tx => {
-      await tx.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY')
-      const { rows: [event] } = await tx.query<{ id: string; name: string; status: string; updated_at: Date }>(
-        `SELECT id,name,status,updated_at FROM events WHERE status IN ('LIVE','PAUSED')
-         ORDER BY updated_at DESC,id DESC LIMIT 1`,
-      )
-      const { rows: [recovery] } = await tx.query<{ count: number }>("SELECT count(*)::int AS count FROM rounds WHERE status='RECOVERY_REQUIRED'")
-      if (!event) return { ok: true as const, event: null, round: null, counts: { participants: 0, draws: 0, pendingClaims: 0, verifiedWinners: 0 }, recoveryRequiredRounds: recovery?.count ?? 0, socketConnections }
-      const { rows: [round] } = await tx.query<{ id: string; round_no: number; name: string; status: string }>(
-        `SELECT id,round_no,name,status FROM rounds WHERE event_id=$1 AND status IN ('ACTIVE','PAUSED','RECOVERY_REQUIRED')
-         ORDER BY round_no DESC LIMIT 1`, [event.id],
-      )
-      if (!round) return { ok: true as const, event: { id: event.id, name: event.name, status: event.status, updated_at: event.updated_at }, round: null, counts: { participants: 0, draws: 0, pendingClaims: 0, verifiedWinners: 0 }, recoveryRequiredRounds: recovery?.count ?? 0, socketConnections }
-      const [{ rows: participants }, { rows: draws }, { rows: pending }, { rows: winners }] = await Promise.all([
-        tx.query<{ count: number }>('SELECT count(*)::int AS count FROM participant_profiles WHERE event_id=$1', [event.id]),
-        tx.query<{ count: number }>('SELECT count(*)::int AS count FROM round_draws WHERE round_id=$1', [round.id]),
-        tx.query<{ count: number }>("SELECT count(*)::int AS count FROM round_claims WHERE round_id=$1 AND status='PENDING_VERIFICATION'", [round.id]),
-        tx.query<{ count: number }>("SELECT count(*)::int AS count FROM round_claims WHERE round_id=$1 AND status='VERIFIED'", [round.id]),
-      ])
-      return {
-        ok: true as const,
-        event: { id: event.id, name: event.name, status: event.status, updated_at: event.updated_at },
-        round,
-        counts: { participants: participants[0]?.count ?? 0, draws: draws[0]?.count ?? 0, pendingClaims: pending[0]?.count ?? 0, verifiedWinners: winners[0]?.count ?? 0 },
-        recoveryRequiredRounds: recovery?.count ?? 0,
-        socketConnections,
-      }
-    })
+    const { rows: [counts] } = await this.db.query<{
+      participants: number; games: number; activeGames: number; draws: number; acceptedClaims: number; rejectedClaims: number
+    }>(`SELECT
+      (SELECT count(*)::int FROM participant_profiles) AS participants,
+      (SELECT count(*)::int FROM games) AS games,
+      (SELECT count(*)::int FROM games WHERE status IN ('playing','closing','paused')) AS "activeGames",
+      (SELECT count(*)::int FROM game_calls) AS draws,
+      (SELECT count(*)::int FROM claims WHERE status='accepted') AS "acceptedClaims",
+      (SELECT count(*)::int FROM claims WHERE status='rejected') AS "rejectedClaims"`)
+    return { ok: true as const, counts, socketConnections }
   }
 
   async audit(input: { limit: number; actorId?: string; action?: string; from?: string; to?: string; cursor?: string }) {
@@ -102,20 +83,12 @@ export class OperationsService {
   }
 
   async system() {
-    let recoveryRequiredRounds: number | null = null
-    let latestMigration: string | null = null
-    let ready: boolean | null = null
     try {
-      const [{ rows: [recovery] }, { rows: [migration] }] = await Promise.all([
-        this.db.query<{ count: number }>("SELECT count(*)::int AS count FROM rounds WHERE status='RECOVERY_REQUIRED'"),
-        this.db.query<{ name: string }>('SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1'),
-      ])
-      recoveryRequiredRounds = recovery?.count ?? null
-      latestMigration = migration?.name ?? null
-      ready = true
+      await this.db.query('SELECT id FROM games LIMIT 0')
+      const { rows: [migration] } = await this.db.query<{ name: string }>('SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1')
+      return { ok: true as const, version: process.env.RELEASE_VERSION ?? null, nodeVersion: process.version, readiness: true, latestMigration: migration?.name ?? null }
     } catch {
-      ready = false
+      return { ok: true as const, version: process.env.RELEASE_VERSION ?? null, nodeVersion: process.version, readiness: false, latestMigration: null }
     }
-    return { ok: true as const, version: process.env.RELEASE_VERSION ?? null, nodeVersion: process.version, readiness: ready, recoveryRequiredRounds, latestMigration }
   }
 }

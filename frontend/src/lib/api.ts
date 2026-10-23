@@ -78,20 +78,7 @@ export async function deleteAdminAccount(profileId: string): Promise<{ ok: true 
   return request(`/v1/super-admin/admins/${encodeURIComponent(profileId)}`, { method: 'DELETE' })
 }
 
-export interface AdminEvent {
-  id: string
-  name: string
-  description: string | null
-  status: string
-  created_at: string
-  updated_at: string
-  participant_count: number
-}
-
-export async function listEvents(): Promise<{ ok: true; events: AdminEvent[] }> {
-  return request('/v1/admin/events')
-}
-export interface EventParticipant {
+export interface Participant {
   profile_id: string
   name: string
   email: string
@@ -101,15 +88,11 @@ export interface EventParticipant {
   last_sent_at: string | null
   attempts: number | null
 }
-export async function listEventParticipants(eventId: string): Promise<{ ok: true; participants: EventParticipant[] }> {
-  return request(`/v1/admin/events/${encodeURIComponent(eventId)}/participants`)
+export async function listParticipants(): Promise<{ ok: true; participants: Participant[] }> {
+  return request('/v1/admin/participants')
 }
-export async function issueParticipantCredential(eventId: string, profileId: string): Promise<{ ok: true; credential_status: string; email: string }> {
-  return request(`/v1/admin/events/${encodeURIComponent(eventId)}/participants/${encodeURIComponent(profileId)}/credentials`, { method: 'POST', body: {} })
-}
-
-export async function createEvent(input: { name: string; description?: string }): Promise<{ ok: true; event: AdminEvent }> {
-  return request('/v1/admin/events', { method: 'POST', body: input })
+export async function issueParticipantCredential(profileId: string): Promise<{ ok: true; credential_status: string; email: string }> {
+  return request(`/v1/admin/participants/${encodeURIComponent(profileId)}/credentials`, { method: 'POST', body: {} })
 }
 
 export interface ParticipantImportResult {
@@ -120,114 +103,13 @@ export interface ParticipantImportResult {
   rows: Array<{ row: number; status: 'created' | 'skipped' | 'failed'; message?: string }>
 }
 
-export async function importParticipants(eventId: string, csv: string): Promise<ParticipantImportResult> {
-  return request(`/v1/admin/events/${encodeURIComponent(eventId)}/participants/import`, { method: 'POST', body: csv })
-}
-
-export interface AdminRound {
-  id: string
-  event_id: string
-  round_no: number
-  name: string
-  status: string
-  question_count: number
-  ticket_count: number
-  patterns: Array<{ pattern: string; enabled: boolean; max_winners: number; status: string }>
-}
-
-export interface EventKey { id: string; value: string; active: boolean }
-export interface RoundQuestion { id: string; key_id: string; key: string; question: string; active: boolean }
-export interface RoundDraw { id?: string; seq: number; key_id?: string; manual?: boolean; drawn_at?: string; revealed_at?: string | null; question?: string | null; key?: string | null }
-export interface RoundAdminClaim { id: string; pattern: string; status: string; points: number; penalty: number; cut_cell_id: string | null; submitted_at: string; reviewed_at: string | null; reason: string | null; participant_name: string; participant_email: string }
-export interface AdminRoundState {
-  ok: true
-  event: { id: string; name: string; status: string }
-  round: { id: string; number: number; name: string; status: string }
-  draws: RoundDraw[]
-  winners: Array<{ pattern: string; name: string; verified_at: string }>
-  pending_claims: number
-  recovery: { validation_status: string; validation_issues: string[]; last_validated_at: string; detected_at: string; resolved_at: string | null } | null
-  claims: RoundAdminClaim[]
-}
-
-export async function listRounds(eventId: string): Promise<{ ok: true; rounds: AdminRound[] }> {
-  return request(`/v1/admin/events/${encodeURIComponent(eventId)}/rounds`)
-}
-export async function createRound(eventId: string, name: string): Promise<{ ok: true; round: { id: string } }> {
-  return request(`/v1/admin/events/${encodeURIComponent(eventId)}/rounds`, { method: 'POST', body: { name } })
-}
-export async function listEventKeys(eventId: string): Promise<{ ok: true; keys: EventKey[] }> {
-  return request(`/v1/admin/events/${encodeURIComponent(eventId)}/keys`)
-}
-export async function addEventKey(eventId: string, value: string): Promise<{ ok: true; key: EventKey }> {
-  return request(`/v1/admin/events/${encodeURIComponent(eventId)}/keys`, { method: 'POST', body: { value } })
-}
-export async function listRoundQuestions(roundId: string): Promise<{ ok: true; questions: RoundQuestion[] }> {
-  return request(`/v1/admin/rounds/${encodeURIComponent(roundId)}/questions`)
-}
-export async function addRoundQuestion(roundId: string, keyId: string, question: string): Promise<{ ok: true }> {
-  return request(`/v1/admin/rounds/${encodeURIComponent(roundId)}/questions`, { method: 'POST', body: { keyId, question } })
-}
-export async function generateRoundTickets(roundId: string): Promise<{ ok: true; created: number; total: number }> {
-  return request(`/v1/admin/rounds/${encodeURIComponent(roundId)}/tickets/generate`, { method: 'POST', body: {} })
-}
-export async function changeRoundStatus(roundId: string, action: 'ready'|'start'|'pause'|'resume'|'complete'|'cancel'): Promise<{ ok: true; status: string }> {
-  return request(`/v1/admin/rounds/${encodeURIComponent(roundId)}/${action}`, { method: 'POST', body: {} })
-}
-export async function setRoundPattern(roundId: string, pattern: string, enabled: boolean, maxWinners: number) {
-  return request(`/v1/admin/rounds/${encodeURIComponent(roundId)}/patterns/${encodeURIComponent(pattern)}`, {
-    method: 'PATCH', body: { enabled, maxWinners },
-  })
-}
-export async function getAdminRoundState(roundId: string): Promise<AdminRoundState> {
-  return request(`/v1/admin/rounds/${encodeURIComponent(roundId)}/state`)
-}
-export async function drawRoundQuestion(roundId: string, keyId?: string) {
-  return request<{ ok: true; draw: RoundDraw }>(`/v1/admin/rounds/${encodeURIComponent(roundId)}/draws`, { method: 'POST', body: keyId ? { keyId } : {} })
-}
-export async function revealRoundDraw(roundId: string, seq: number) {
-  return request(`/v1/admin/rounds/${encodeURIComponent(roundId)}/draws/reveal`, { method: 'POST', body: { seq } })
-}
-export async function reviewRoundClaim(claimId: string, decision: 'verify'|'reject', reason?: string) {
-  return request(`/v1/admin/claims/${encodeURIComponent(claimId)}/review`, { method: 'POST', body: { decision, reason } })
-}
-
-export interface ParticipantRoundInfo { id: string; round_no: number; name: string; status: string; has_ticket: boolean }
-export async function listMyRounds(): Promise<{ ok: true; event: { id: string; name: string; status: string }; rounds: ParticipantRoundInfo[] }> {
-  return request('/v1/participant/rounds')
-}
-export interface ParticipantRoundState {
-  ok: true
-  event: { id: string; name: string; status: string }
-  round: { id: string; number: number; name: string; status: string }
-  draws: RoundDraw[]
-  winners: Array<{ pattern: string; name: string; verified_at: string }>
-  ticket: { cells: Array<Array<{ id: string; value: string } | null>>; marked_cell_ids: string[]; cut_cell_ids: string[] }
-  score: { score: number; wrong_claims: number }
-  claims: Array<{ pattern: string; status: string; submitted_at: string; reviewed_at: string | null; reason: string | null; points: number; penalty: number; cut_cell_id: string | null }>
-  patterns: Array<{ pattern: string; enabled: boolean; max_winners: number; status: string }>
-}
-export async function getMyRound(roundId: string): Promise<ParticipantRoundState> {
-  return request(`/v1/participant/rounds/${encodeURIComponent(roundId)}`)
-}
-export async function markMyCell(roundId: string, keyId: string, marked: boolean): Promise<{ ok: true; marked_cell_ids: string[] }> {
-  return marked
-    ? request(`/v1/participant/rounds/${encodeURIComponent(roundId)}/marks`, { method: 'POST', body: { keyId } })
-    : request(`/v1/participant/rounds/${encodeURIComponent(roundId)}/marks/${encodeURIComponent(keyId)}`, { method: 'DELETE' })
-}
-export async function submitMyClaim(roundId: string, pattern: string) {
-  return request(`/v1/participant/rounds/${encodeURIComponent(roundId)}/claims`, { method: 'POST', body: { pattern } })
-}
-export async function getPublicRound(roundId: string) {
-  return request<{ ok: true; event: { name: string }; round: { name: string; number: number; status: string }; draws: RoundDraw[]; winners: Array<{ pattern: string; name: string; points: number }>; standings: Array<{ name: string; score: number; wrong_claims: number }> }>(`/v1/public/rounds/${encodeURIComponent(roundId)}`)
+export async function importParticipants(csv: string): Promise<ParticipantImportResult> {
+  return request('/v1/admin/participants/import', { method: 'POST', body: csv, bodyFormat: 'text', headers: { 'Content-Type': 'text/csv' } })
 }
 
 export interface AdminDashboard {
   ok: true
-  event: { id: string; name: string; status: string; updated_at: string } | null
-  round: { id: string; round_no: number; name: string; status: string } | null
-  counts: { participants: number; draws: number; pendingClaims: number; verifiedWinners: number }
-  recoveryRequiredRounds: number
+  counts: { participants: number; games: number; activeGames: number; draws: number; acceptedClaims: number; rejectedClaims: number }
   socketConnections: number
 }
 export async function getAdminDashboard(): Promise<AdminDashboard> { return request('/v1/admin/dashboard') }
@@ -237,14 +119,9 @@ export async function listAudit(input: { cursor?: string; limit?: number; actorI
   for (const [key, value] of Object.entries(input)) if (value !== undefined && value !== '') query.set(key, String(value))
   return request(`/v1/admin/audit${query.size ? `?${query}` : ''}`)
 }
-export async function getSystemDiagnostics(): Promise<{ ok: true; version: string | null; nodeVersion: string; readiness: boolean | null; recoveryRequiredRounds: number | null; latestMigration: string | null }> {
+export async function getSystemDiagnostics(): Promise<{ ok: true; version: string | null; nodeVersion: string; readiness: boolean | null; latestMigration: string | null }> {
   return request('/v1/super-admin/system')
 }
-export async function recoverRound(roundId: string): Promise<{ ok: true; status: string }> {
-  return request(`/v1/super-admin/rounds/${encodeURIComponent(roundId)}/recover`, { method: 'POST', body: {} })
-}
-
-
 export async function createGame(hostName: string): Promise<CreateGameResult> {
   const result = await request<CreateGameResult>('/games', { method: 'POST', body: { hostName: hostName.trim(), bank: getActiveBank() } })
   sessions.saveHost({ game_id: result.game_id, code: result.code, player_id: result.player_id,
@@ -252,7 +129,7 @@ export async function createGame(hostName: string): Promise<CreateGameResult> {
   return result
 }
 export async function listAccountGames() {
-  return request<{ok:true;games:Array<{id:string;code:string;status:string;created_at:string}>}>('/games')
+  return request<{ok:true;games:Array<{id:string;code:string;status:string;created_at:string;host_name:string;can_manage:boolean}>}>('/games')
 }
 export async function resumeAccountGame(gameId:string) {
   const result=await request<CreateGameResult>(`/games/${encodeURIComponent(gameId)}/session`,{method:'POST',body:{}})

@@ -12,6 +12,7 @@ await mkdir(out, { recursive: true })
 const browser = await chromium.launch({ headless: true })
 const errors = []
 const results = []
+let hostPage
 async function role(id, width = 390) {
   const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: width < 640, hasTouch: width < 640 })
   const page = await context.newPage()
@@ -19,8 +20,8 @@ async function role(id, width = 390) {
   page.on('dialog', dialog => dialog.accept())
   await page.goto(origin)
   await page.getByRole('button', { name: new RegExp(`^${id === 'superadmin' ? 'Super Admin' : id === 'admin1' ? 'Admin 1' : `Member ${id.slice(-1)}`} `) }).click()
-  await page.waitForURL(id.startsWith('user') ? '**/account' : '**/admin')
-  await page.getByRole('heading', { name: id.startsWith('user') ? 'Got a game code?' : 'Game control.', exact: true }).waitFor()
+  await page.waitForURL(id.startsWith('user') ? '**/account' : id === 'superadmin' ? '**/super-admin' : '**/admin')
+  await page.getByRole('heading', { name: id.startsWith('user') ? 'Got a game code?' : id === 'superadmin' ? 'Super Admin' : 'Game control.', exact: true }).waitFor()
   return { context, page, id }
 }
 async function measure(actor, name) {
@@ -66,6 +67,7 @@ try {
   await entryContext.close()
   const root = await role('superadmin', 1280)
   const admin = await role('admin1')
+  hostPage = admin.page
   const diagnostics = await root.context.request.get('http://localhost:3001/api/v1/super-admin/system')
   assert.equal((await diagnostics.json()).readiness, true)
   await measure(root, 'super-admin')
@@ -154,54 +156,6 @@ try {
   assert.equal(final.status, 'finished')
   assert.equal(new Set(final.calls.map(call => call.number)).size, 90)
   results.push({ name: 'full-game', players: 3, calls: 90, acceptedClaims: final.claims.filter(c => c.status === 'accepted').length, status: final.status })
-  // Exercise the separate event-round workflow and its mobile ticket too.
-  async function roundRequest(actor, path, method = 'GET', body) {
-    const response = await actor.context.request.fetch(`http://localhost:3001/api/v1${path}`, {
-      method, headers: { Origin: origin, 'Idempotency-Key': crypto.randomUUID() }, data: body,
-    })
-    assert.ok(response.ok(), await response.text())
-    return response.json()
-  }
-  const events = await roundRequest(admin, '/admin/events')
-  const demoEvent = events.events.find(event => event.name === 'Demo event')
-  assert.equal(demoEvent.status, 'DRAFT', 'Restart npm run dev:demo before each browser audit')
-  const eventId = demoEvent.id
-  const created = await roundRequest(admin, `/admin/events/${eventId}/rounds`, 'POST', { name: 'Mobile audit round' })
-  const roundId = created.round.id
-  const keys = []
-  for (let i = 1; i <= 20; i++) {
-    const key = await roundRequest(admin, `/admin/events/${eventId}/keys`, 'POST', { value: `Audit ${roundId.slice(0, 8)} technical term ${i}` })
-    keys.push(key.key.id)
-    await roundRequest(admin, `/admin/rounds/${roundId}/questions`, 'POST', { keyId: key.key.id, question: `Technical clue ${i}` })
-  }
-  const assigned = await roundRequest(admin, `/admin/rounds/${roundId}/tickets/generate`, 'POST', {})
-  assert.equal(assigned.total, 6)
-  await roundRequest(admin, `/admin/rounds/${roundId}/ready`, 'POST', {})
-  await roundRequest(admin, `/admin/rounds/${roundId}/start`, 'POST', {})
-  for (const keyId of keys) {
-    const draw = await roundRequest(admin, `/admin/rounds/${roundId}/draws`, 'POST', { keyId })
-    await roundRequest(admin, `/admin/rounds/${roundId}/draws/reveal`, 'POST', { seq: draw.draw.seq })
-  }
-  for (const actor of players) {
-    await actor.page.goto(`${origin}/account/round/${roundId}`)
-    await actor.page.getByRole('heading', { name: 'Draw history', exact: true }).waitFor()
-  }
-  await measure(players[0], 'event-round-ticket')
-  const roundState = await roundRequest(players[0], `/participant/rounds/${roundId}`)
-  assert.equal(roundState.draws.filter(draw => draw.revealed_at).length, 20)
-  for (const cell of roundState.ticket.cells.flat().filter(Boolean).slice(0, 5)) {
-    await players[0].page.getByRole('button', { name: cell.value, exact: true }).click()
-    await players[0].page.getByRole('button', { name: `${cell.value}, marked`, exact: true }).waitFor()
-  }
-  const claim = await roundRequest(players[0], `/participant/rounds/${roundId}/claims`, 'POST', { pattern: 'early_five' })
-  assert.equal(claim.claim.status, 'PENDING_VERIFICATION')
-  const verified = await roundRequest(admin, `/admin/claims/${claim.claim.id}/review`, 'POST', { decision: 'verify' })
-  assert.equal(verified.claim.status, 'VERIFIED')
-  await players[0].page.getByRole('heading', { name: 'Verified winners', exact: true }).waitFor()
-  await roundRequest(admin, `/admin/rounds/${roundId}/pause`, 'POST', {})
-  await roundRequest(admin, `/admin/rounds/${roundId}/resume`, 'POST', {})
-  await roundRequest(admin, `/admin/rounds/${roundId}/complete`, 'POST', {})
-  results.push({ name: 'event-round', assigned: assigned.total, testedPlayers: 3, revealed: 20, verifiedClaims: 1, status: 'COMPLETED' })
   const audit = { entries: [] }
   let cursor = ''
   do {
@@ -212,7 +166,7 @@ try {
     cursor = batch.nextCursor
   } while (cursor)
   for (const action of ['GAME_STARTED', 'GAME_ANSWERS_REVEALED', 'GAME_CLAIM_ACCEPTED', 'GAME_CLAIM_REJECTED']) assert.ok(audit.entries.some(entry => entry.action === action && entry.resourceId === host.game_id), action)
-  await root.page.reload()
+  await root.page.goto(`${origin}/admin/audit`)
   await root.page.getByPlaceholder('Exact action').fill('GAME_ANSWERS_REVEALED')
   await root.page.getByRole('button', { name: 'Apply filters', exact: true }).click()
   await root.page.getByText('GAME_ANSWERS_REVEALED', { exact: false }).first().waitFor()
@@ -223,6 +177,12 @@ try {
   console.log(JSON.stringify(results, null, 2))
   assert.deepEqual(errors, [])
   for (const result of results.filter(result => result.sizes)) for (const size of result.sizes) assert.ok(size.content <= size.viewport, `${result.name} overflows: ${JSON.stringify(size)}`)
+} catch (error) {
+  if (hostPage) {
+    console.log('Host at failure:', (await hostPage.locator('body').innerText()).slice(0, 3000))
+    await hostPage.screenshot({ path: `${out}/game-failure.png`, fullPage: true })
+  }
+  throw error
 } finally {
   await writeFile(`${out}/results.json`, JSON.stringify(results, null, 2))
   await browser.close()

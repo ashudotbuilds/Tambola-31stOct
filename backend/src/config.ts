@@ -15,6 +15,8 @@ const schema = z.object({
   DATABASE_POOL_MAX: z.coerce.number().int().positive().max(50).default(10),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
   SUPER_ADMIN_BOOTSTRAP_SECRET: z.string().min(32).optional(),
+  // Role shortcuts remain enabled during the current testing stage.
+  TEST_ACCOUNTS_ENABLED: z.enum(['true', 'false']).default('true').transform(value => value === 'true'),
   EMAIL_API_URL: z.string().url().optional(),
   EMAIL_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().email().optional(),

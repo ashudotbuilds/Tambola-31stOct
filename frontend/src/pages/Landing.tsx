@@ -188,7 +188,7 @@ export default function Landing() {
       ) : null}
 
       <section className="card p-5 sm:p-6">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">How a round works</h2>
+        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">How a game works</h2>
         <div className="mt-3 grid gap-4 sm:grid-cols-3">
           {[
             {

@@ -7,7 +7,7 @@ export default function AccountGuard({
   role,
 }: {
   children: ReactNode
-  role?: 'admin' | 'member'
+  role?: 'admin' | 'member' | 'super-admin'
 }) {
   const [state, setState] = useState<string | null>(null)
   const location = useLocation()
@@ -33,6 +33,8 @@ export default function AccountGuard({
   if (state === 'anonymous') return <Navigate to="/login" replace />
   if (role === 'admin' && state === 'PARTICIPANT')
     return <Navigate to="/account" replace />
+  if (role === 'super-admin' && state !== 'SUPER_ADMIN')
+    return <Navigate to={state === 'PARTICIPANT' ? '/account' : '/admin'} replace />
   if (role === 'member' && state !== 'PARTICIPANT')
     return <Navigate to="/admin" replace />
   return children

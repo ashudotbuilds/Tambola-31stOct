@@ -125,7 +125,7 @@ pre { tab-size: 2; }
 .join-code { @apply font-mono text-3xl uppercase tracking-[0.3em] sm:text-4xl; }
 .admin-nav { @apply sticky top-0 z-30 flex gap-1 overflow-x-auto border-b border-edge py-3; background: var(--paper); }
 .admin-nav a { @apply whitespace-nowrap rounded-md px-4 py-3 font-mono text-xs text-slate-400 hover:bg-panel hover:text-cyan; }
-.admin-nav a:first-child { @apply bg-panel text-cyan; }
+.admin-nav a[aria-current="page"] { @apply bg-panel text-cyan; }
 .admin-workspace > section { scroll-margin-top: 80px; }
 .admin-workspace dl dd { @apply font-mono; }
 .admin-workspace section > h2, .admin-workspace section > div > h2 { @apply text-xl; }
@@ -138,6 +138,8 @@ pre { tab-size: 2; }
 .login-footer { @apply flex flex-wrap justify-between gap-2 border-t border-edge py-5 font-mono text-[10px] uppercase tracking-widest text-slate-500; }
 @media (max-width: 639px) {
   .btn, .admin-nav a { min-height: 44px; }
+  .admin-page-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
+  .admin-page-nav a { white-space: normal; display: flex; align-items: center; }
 }
 html.light .ticket-preview, html.light .login-form { background: #f8f3e9; }
 html.light .ticket-preview { box-shadow: 6px 6px 0 #d4c7b5; }
@@ -158,18 +160,6 @@ html.light .text-slate-400 {
 
 html.light .text-slate-300 {
   color: #655a4c;
-}
-
-html.light .round-ticket-cell {
-  @apply border-slate-300 bg-slate-100 text-slate-800;
-}
-
-html.light .round-ticket-cell[aria-pressed="true"] {
-  @apply border-cyan bg-cyan/15 text-slate-900;
-}
-
-html.light .round-ticket-cell[data-cut="true"] {
-  @apply border-red-300 bg-red-50 text-red-700;
 }
 
 html.light [class~="text-cyan"] {

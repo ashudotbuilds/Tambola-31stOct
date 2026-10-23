@@ -1,13 +1,7 @@
 import { API_URL } from './config'
 
 async function idempotencyIdentity(method: string, path: string, body: unknown) {
-  const critical = (method === 'POST' || method === 'DELETE') && (
-    /^\/v1\/admin\/rounds\/[^/]+\/(?:draws|tickets\/generate|ready|start|pause|resume|complete|cancel)$/.test(path) ||
-    /^\/v1\/admin\/claims\/[^/]+\/review$/.test(path) ||
-    /^\/v1\/admin\/events\/[^/]+\/participants\/import$/.test(path) ||
-    /^\/v1\/participant\/rounds\/[^/]+\/(?:marks|claims)$/.test(path) ||
-    /^\/v1\/participant\/rounds\/[^/]+\/marks\/[^/]+$/.test(path)
-  )
+  const critical = method === 'POST' && path === '/v1/admin/participants/import'
   if (!critical) return null
   const storageKey = `tt.idempotency.${method}.${path}`
   const source = `${method}:${path}:${JSON.stringify(body ?? null)}`
@@ -29,6 +23,7 @@ export async function request<T>(
   options: {
     method?: string
     body?: unknown
+    bodyFormat?: 'json' | 'text'
     token?: string | null
     headers?: Record<string, string>
     credentials?: RequestCredentials
@@ -43,12 +38,12 @@ export async function request<T>(
       method,
       credentials: options.credentials ?? 'include',
       headers: {
-        ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(options.body !== undefined ? { 'Content-Type': options.bodyFormat === 'text' ? 'text/plain' : 'application/json' } : {}),
         ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
         ...(identity ? { 'Idempotency-Key': identity.key } : {}),
         ...options.headers,
       },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.body === undefined ? undefined : options.bodyFormat === 'text' ? String(options.body) : JSON.stringify(options.body),
       signal: controller.signal,
     })
     const result = await response.json().catch(() => null)

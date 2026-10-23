@@ -58,7 +58,6 @@ export interface Principal {
   type: PrincipalType
   profileId: string
   role?: AdminRole
-  eventId?: string
 }
 
 export interface SafeUser {

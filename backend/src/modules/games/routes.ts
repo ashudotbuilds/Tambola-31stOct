@@ -24,7 +24,9 @@ export function gameRoutes(games: GameService, claims: ClaimService, changed: (g
 
   router.post('/', entryLimit, requireRole(['ADMIN']), async (req, res) => {
     const { hostName, bank } = validate.createBody.parse(req.body)
-    res.status(201).json(await games.create(req.auth!.user.name.slice(0,24), bank, req.auth!.user.id))
+    const result = await games.create(req.auth!.user.name.slice(0,24), bank, req.auth!.user.id)
+    changed(result.game_id)
+    res.status(201).json(result)
   })
   router.post('/join', entryLimit, requireRole(['PARTICIPANT']), async (req, res) => {
     const { code, name } = validate.joinBody.parse(req.body)
@@ -36,7 +38,12 @@ export function gameRoutes(games: GameService, claims: ClaimService, changed: (g
     res.json(await games.stateByCode(validate.code.parse(req.params.code)))
   })
   router.get('/', requireRole(['ADMIN']), async(req,res)=>{
-    const {rows}=await games.db.query('SELECT id,code,status,created_at FROM games WHERE account_user_id=$1 OR $2 ORDER BY created_at DESC LIMIT 100',[req.auth!.user.id,req.auth!.principal.type==='SUPER_ADMIN'])
+    res.setHeader('Cache-Control', 'no-store')
+    const {rows}=await games.db.query(`SELECT g.id,g.code,g.status,g.created_at,
+      COALESCE(u.name,'Administrator') AS host_name,
+      (g.account_user_id=$1 OR $2) AS can_manage
+      FROM games g LEFT JOIN users u ON u.id=g.account_user_id
+      ORDER BY g.created_at DESC,g.id DESC LIMIT 100`,[req.auth!.user.id,req.auth!.principal.type==='SUPER_ADMIN'])
     res.json({ok:true,games:rows})
   })
   router.post('/:id/session',requireRole(['ADMIN']),async(req,res)=>{

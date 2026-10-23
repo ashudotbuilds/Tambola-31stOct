@@ -92,6 +92,57 @@ const event = <T>(socket: Socket, name: string) => new Promise<T>((resolve, reje
   socket.once(name, value => { clearTimeout(timeout); resolve(value as T) })
 })
 
+test('admins share the live game catalogue while only owners and super admins manage games', async () => {
+  const admins = await Promise.all(['First', 'Second'].map(async name => {
+    const user = await createUser(db, `${name.toLowerCase()}@sync.test`, passwordHash, name)
+    await createAdminProfile(db, user.id, 'ADMIN')
+    return `tt_session=${(await application.auth.login(user.email, 'TestPassword123!')).token}`
+  }))
+  async function as<T = { games: Array<{ id: string; can_manage: boolean; host_name: string; status: string }> }>(cookie: string, path: string, method = 'GET', body?: unknown, token?: string) {
+    const response = await fetch(`${base}${path}`, { method, headers: {
+      Cookie: cookie, Origin: 'http://localhost:5173', 'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    }, body: body === undefined ? undefined : JSON.stringify(body) })
+    return { status: response.status, body: await response.json() as T }
+  }
+  const sockets = [adminCookie, ...admins].map(cookie => connect(base, {
+    autoConnect: false, extraHeaders: { Cookie: cookie }, auth: { channel: 'admin-dashboard' },
+  }))
+  try {
+    await Promise.all(sockets.map(async socket => { const ready = event(socket, 'room_ready'); socket.connect(); await ready }))
+    const created = sockets.map(socket => event(socket, 'dashboard_changed'))
+    const host = await as<CreateGameResult>(admins[0], '/api/games', 'POST', { hostName: 'First' })
+    assert.equal(host.status, 201)
+    assert.deepEqual(await Promise.all(created), [undefined, undefined, undefined], 'invalidation carries no private data')
+    const id = host.body.game_id
+    const catalogues = await Promise.all([adminCookie, ...admins].map(cookie => as(cookie, '/api/games')))
+    const ids = catalogues.map(result => result.body.games.map((game: { id: string }) => game.id))
+    assert.deepEqual(ids[0], ids[1]); assert.deepEqual(ids[1], ids[2])
+    for (const [index, catalogue] of catalogues.entries()) {
+      const game = catalogue.body.games.find((game: { id: string }) => game.id === id)
+      assert.ok(game)
+      assert.equal(game.can_manage, index !== 2)
+      assert.equal(game.host_name, 'First')
+      assert.equal(game.status, 'lobby')
+    }
+    assert.equal((await as(admins[1], `/api/games/${id}/session`, 'POST', {})).status, 403)
+    assert.equal((await as(admins[1], `/api/games/${id}/start`, 'POST', {}, host.body.host_token)).status, 403)
+    const member = await join(host.body.code, 'Sync Member')
+    const memberCookie = tokenCookies.get(member.player_token)!
+    assert.equal((await as(memberCookie, '/api/games')).status, 403)
+    const denied = connect(base, { autoConnect: false, reconnection: false, extraHeaders: { Cookie: memberCookie }, auth: { channel: 'admin-dashboard' } })
+    try { const failure = event<Error>(denied, 'connect_error'); denied.connect(); assert.match((await failure).message, /Administrator/) }
+    finally { denied.disconnect() }
+    const started = sockets.map(socket => event(socket, 'dashboard_changed'))
+    assert.equal((await as(admins[0], `/api/games/${id}/start`, 'POST', {}, host.body.host_token)).status, 200)
+    await Promise.all(started)
+    for (const cookie of [adminCookie, ...admins]) {
+      const catalogue = await as(cookie, '/api/games')
+      assert.equal(catalogue.body.games.find((game: { id: string }) => game.id === id)?.status, 'playing')
+    }
+  } finally { sockets.forEach(socket => socket.disconnect()) }
+})
+
 test('migration application is repeatable and tracked', async () => {
   assert.deepEqual(await runMigrations(db, migrationDir), [
     'applied 001_initial.sql', 'applied 002_auth.sql', 'applied 003_event_participants.sql',

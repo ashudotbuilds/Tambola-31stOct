@@ -1,5 +1,11 @@
 # Technical Tambola
 
+The active game model is **one continuous Tambola game**. Admins import players
+on `/admin/participants`, create a game on `/admin`, and share its code. Players
+join, mark their ticket, and claim prizes until the game ends. There is no event
+or round setup. Historical SQL migrations remain immutable for existing data.
+
+
 A multiplayer technical tambola game for ACM Engineering Day. Players solve
 computer science clues and code questions, then manually mark the matching terms
 on their tickets. A host controls the game while a projector shows the live round.

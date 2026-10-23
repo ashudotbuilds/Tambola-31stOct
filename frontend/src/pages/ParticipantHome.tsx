@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   getCurrentUser,
   joinGame,
-  listMyRounds,
   logoutUser,
-  type ParticipantRoundInfo,
 } from '@/lib/api'
 import { request } from '@/lib/http'
 import { ArrowRight, LogOut } from 'lucide-react'
@@ -14,7 +12,6 @@ export default function ParticipantHome() {
   const navigate = useNavigate()
   const [name, setName] = useState(''),
     [email, setEmail] = useState(''),
-    [rounds, setRounds] = useState<ParticipantRoundInfo[]>([]),
     [code, setCode] = useState(
       new URLSearchParams(window.location.search).get('code') ?? '',
     ),
@@ -23,12 +20,11 @@ export default function ParticipantHome() {
     [message, setMessage] = useState('')
   useEffect(() => {
     let active = true
-    Promise.all([getCurrentUser(), listMyRounds()])
-      .then(([account, result]) => {
+    getCurrentUser()
+      .then((account) => {
         if (active) {
           setName(account.user.name)
           setEmail(account.user.email)
-          setRounds(result.rounds)
         }
       })
       .catch((cause) => setMessage(cause.message))
@@ -79,7 +75,7 @@ export default function ParticipantHome() {
       >
         <h2 className="text-2xl font-bold">Join a game</h2>
         <p className="text-sm text-slate-400">
-          Enter the administrator’s code. Practice with the tutorial while
+          Enter the host’s code. Practice with the tutorial while
           waiting for the game to start.
         </p>
         <label className="block text-sm">
@@ -185,26 +181,6 @@ export default function ParticipantHome() {
         <p role="status" className="card p-4">
           {message}
         </p>
-      )}
-      {rounds.length > 0 && (
-        <section className="card p-5">
-          <h2 className="text-xl font-bold">Assigned event rounds</h2>
-          {rounds.map((round) => (
-            <article
-              key={round.id}
-              className="mt-3 flex items-center justify-between gap-3"
-            >
-              <p>
-                {round.name} · {round.status}
-              </p>
-              {round.has_ticket && (
-                <Link className="btn" to={`/account/round/${round.id}`}>
-                  Open ticket
-                </Link>
-              )}
-            </article>
-          ))}
-        </section>
       )}
     </main>
   )

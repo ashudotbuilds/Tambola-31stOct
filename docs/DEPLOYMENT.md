@@ -83,6 +83,19 @@ Set `DATABASE_URL`, `MIGRATION_DATABASE_URL` if used, `NODE_ENV=production`,
 for example `https://your-tambola.vercel.app`. Avoid trailing slashes or paths.
 Render supplies `PORT`; the server binds that port for both HTTP and Socket.IO.
 
+During the current testing stage, `TEST_ACCOUNTS_ENABLED=true` (the default) keeps
+the Super Admin, Admin 1–3, and Member 1–6 sign-in buttons available in production.
+The backend creates persistent test accounts in a reserved namespace on startup,
+using the existing database schema; redeploying preserves their IDs and games.
+The shared test password is `DemoPass123!`. These are public login shortcuts with
+the displayed role's normal permissions, including Super Admin access.
+No email provider is needed for these accounts.
+
+When testing ends, set `TEST_ACCOUNTS_ENABLED=false` in Render and redeploy. This
+hides the shortcuts, suspends the reserved test accounts and revokes their active
+sessions while preserving their games and history. Real accounts stay unchanged.
+Existing Render services do not need a new variable now because the default is true.
+
 The Blueprint selects an always-on Starter service, with a pre-deploy migration
 command. Creating that service is a choice you make in Render and may incur
 charges. If you choose a plan without pre-deploy commands, apply migrations from

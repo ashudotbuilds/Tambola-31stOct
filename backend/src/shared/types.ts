@@ -201,7 +201,6 @@ export interface AuthPrincipal {
   type: PrincipalType
   profileId: string
   role?: AdminRole
-  eventId?: string
 }
 
 export interface LoginResult {

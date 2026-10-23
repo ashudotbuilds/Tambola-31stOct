@@ -29,7 +29,7 @@ export default function Login() {
       navigate(
         result.principal.type === 'PARTICIPANT'
           ? '/account' + window.location.search
-          : '/admin',
+          : result.principal.type === 'SUPER_ADMIN' ? '/super-admin' : '/admin',
         { replace: true },
       )
     } catch (cause) {
@@ -54,7 +54,7 @@ export default function Login() {
       </section>
       <div className="min-w-0 space-y-7 lg:pt-2">
       <form className="login-form space-y-5" onSubmit={submit}>
-        <div className="mb-6"><p className="eyebrow text-cyan">Ready when you are</p><h2 className="mt-2 text-3xl font-bold">Take your seat.</h2><p className="mt-2 text-sm text-slate-400">Sign in with your event account.</p></div>
+        <div className="mb-6"><p className="eyebrow text-cyan">Ready when you are</p><h2 className="mt-2 text-3xl font-bold">Take your seat.</h2><p className="mt-2 text-sm text-slate-400">Sign in with your account.</p></div>
         <label className="block text-sm">
           User ID or email
           <input
@@ -96,7 +96,7 @@ export default function Login() {
       </div>
       {accounts.length > 0 && (
         <section className="mb-10 border-t border-edge pt-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="font-display text-lg font-bold">Testing accounts</h2><span className="eyebrow">Local demo only</span></div>
+          <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="font-display text-lg font-bold">Testing accounts</h2><span className="eyebrow">Testing access</span></div>
           <p className="mt-1 text-sm text-slate-400">
             Choose an account to sign in. Password: DemoPass123!
           </p>

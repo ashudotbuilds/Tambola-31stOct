@@ -16,7 +16,7 @@ await runMigrations(
 const {
   rows: [event],
 } = await db.query<{ id: string }>(
-  "INSERT INTO events(name) VALUES ('Demo event') RETURNING id",
+  "INSERT INTO events(name) VALUES ('Participant directory') RETURNING id",
 )
 const accounts = []
 const passwordHash = await hashPassword('DemoPass123!')

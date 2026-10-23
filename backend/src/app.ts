@@ -13,17 +13,13 @@ import { ClaimService } from './modules/games/claims'
 import { gameRoutes } from './modules/games/routes'
 import { AuthService } from './modules/auth/service'
 import { authRoutes, superAdminRoutes } from './modules/auth/routes'
-import { EventService } from './modules/events/service'
-import { adminEventRoutes } from './modules/events/routes'
-import { RoundService } from './modules/rounds/service'
-import { adminRoundRoutes, participantRoundRoutes, publicRoundRoutes, superAdminRecoveryRoutes } from './modules/rounds/routes'
-import { attachRooms, roomName, roundRoomName } from './realtime/rooms'
+import { ParticipantService } from './modules/participants/service'
+import { participantRoutes } from './modules/participants/routes'
+import { attachRooms, roomName, adminRoomName } from './realtime/rooms'
 import { EmailAdapter, type EmailOptions } from './modules/email/adapter'
 import { OperationsService } from './modules/operations/service'
 import { adminOperationsRoutes, superAdminOperationsRoutes } from './modules/operations/routes'
-import { RecoveryService } from './modules/recovery/service'
 import { parse as parseCookies } from 'cookie'
-import { requireAuth } from './modules/auth/middleware'
 
 export function createApplication(
   db: Database,
@@ -65,13 +61,9 @@ export function createApplication(
     await db.query('SELECT id FROM users LIMIT 0')
     await db.query('SELECT id FROM events LIMIT 0')
     await db.query('SELECT id FROM participant_profiles LIMIT 0')
-    await db.query('SELECT id FROM rounds LIMIT 0')
-    await db.query('SELECT id FROM event_keys LIMIT 0')
-    await db.query('SELECT id FROM round_draws LIMIT 0')
     await db.query('SELECT id FROM idempotency_records LIMIT 0')
     await db.query('SELECT participant_profile_id FROM participant_credential_deliveries LIMIT 0')
     await db.query('SELECT admin_profile_id FROM admin_credential_deliveries LIMIT 0')
-    await db.query('SELECT round_id FROM round_recovery_records LIMIT 0')
     res.json({ ok: true })
   })
   app.use('/api', rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: 'draft-7', legacyHeaders: false,
@@ -86,12 +78,10 @@ export function createApplication(
   const claims = new ClaimService(db)
   const email = new EmailAdapter(options.email)
   const auth = new AuthService(db, { bootstrapSecret: options.bootstrapSecret, email })
-  const events = new EventService(db, email)
-  const rounds = new RoundService(db)
+  const participants = new ParticipantService(db, email)
   const operations = new OperationsService(db)
-  const recovery = new RecoveryService(db)
 
-  attachRooms(io, games, auth, rounds)
+  attachRooms(io, games, auth)
   app.use('/api/games', async (req, _res, next) => {
     try {
       const token = parseCookies(req.headers.cookie ?? '').tt_session
@@ -99,21 +89,20 @@ export function createApplication(
       req.auth = await auth.authenticate(token)
       next()
     } catch (error) { next(error) }
-  }, gameRoutes(games, claims, id => io.to(roomName(id)).emit('game_changed')))
+  }, gameRoutes(games, claims, id => {
+    io.to(roomName(id)).emit('game_changed')
+    io.to(adminRoomName).emit('dashboard_changed')
+  }))
   app.use('/api/v1/auth', authRoutes(auth))
   app.get('/api/v1/demo/accounts', (_req,res) => {
-    if (!options.demoAccounts || process.env.NODE_ENV === 'production') { res.status(404).json({ok:false}); return }
+    res.setHeader('Cache-Control', 'no-store')
+    if (!options.demoAccounts) { res.status(404).json({ok:false}); return }
     res.json({ok:true,accounts:options.demoAccounts})
   })
   app.use('/api/v1/super-admin', superAdminRoutes(auth))
   app.use('/api/v1/super-admin', superAdminOperationsRoutes(operations, auth))
-  app.use('/api/v1/admin', adminEventRoutes(events, auth))
+  app.use('/api/v1/admin', participantRoutes(participants, auth))
   app.use('/api/v1/admin', adminOperationsRoutes(operations, auth, () => io.engine.clientsCount))
-  const roundChanged = (id: string) => { if (id) io.to(roundRoomName(id)).emit('round_changed') }
-  app.use('/api/v1/admin', adminRoundRoutes(rounds, auth, roundChanged))
-  app.use('/api/v1/super-admin', superAdminRecoveryRoutes(recovery, auth, roundChanged))
-  app.use('/api/v1/participant/rounds', participantRoundRoutes(rounds, auth, roundChanged))
-  app.use('/api/v1/public/rounds', requireAuth(auth), publicRoundRoutes(rounds))
   app.use((_req, res) => { res.status(404).json({ ok: false, error: 'Route not found' }) })
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     const requestId = String(res.locals.requestId ?? '')
@@ -143,5 +132,5 @@ export function createApplication(
     }
   }
   app.use(errorHandler)
-  return { app, server, io, games, claims, auth, events, rounds, operations, recovery }
+  return { app, server, io, games, claims, auth, participants, operations }
 }

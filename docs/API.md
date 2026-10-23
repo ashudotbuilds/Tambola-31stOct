@@ -6,12 +6,15 @@ POST/PUT/PATCH bodies use `Content-Type: application/json`.
 All game and display APIs now require an authenticated account cookie. Game
 bearer tokens provide an additional game scope and do not replace account login.
 Only Admins create games; members join with codes using their account names.
-`GET /api/games` lists an Admin's games (all games for Super Admin), and
+`GET /api/games` lists the same latest 100 games for Admins and Super Admins,
+including `host_name` and an account-specific `can_manage` flag. Only the owner
+or a Super Admin can restore or operate the host session. Other Admins can view
+the public game board. The list is not cached, and
 `POST /api/games/:id/session` restores an authorized Admin's host session.
 `PATCH /api/v1/auth/profile` updates name/email/password after verifying
 `currentPassword`; changing email preserves the login ID.
 
-## Legacy game sessions
+## Game sessions
 
 `POST /api/games` returns a host session containing `game_id`, `code`, `player_id`,
 `display_name`, `player_token`, and `host_token`.
@@ -25,7 +28,7 @@ The existing `/api/games` proof-of-concept retains these sessions in localStorag
 They are separate from registered account sessions below. Host and player sessions
 can coexist on a device for local development.
 
-## Registered accounts and event rounds
+## Registered accounts and participants
 
 The account API is rooted at `/api/v1`. Login issues an opaque `tt_session`
 HttpOnly cookie; the JSON response never contains the raw token. Browser requests
@@ -49,43 +52,20 @@ HTTP email adapter, and stores only its password hash.
 | GET/POST | `/api/v1/super-admin/admins` | Super Admin | List or create Admin `{ email, name, role }` |
 | DELETE | `/api/v1/super-admin/admins/:id` | Super Admin | Delete another administrator |
 | POST | `/api/v1/super-admin/admins/:id/credentials` | Super Admin | Issue a new temporary password by email |
-| GET/POST | `/api/v1/admin/events` | Admin | List or create event `{ name, description? }` |
-| GET | `/api/v1/admin/events/:eventId/participants` | Admin | Participant and credential delivery status |
-| POST | `/api/v1/admin/events/:eventId/participants/import` | Admin | CSV text or `{ rows: [...] }`; requires `Idempotency-Key` |
-| POST | `/api/v1/admin/events/:eventId/participants/:profileId/credentials` | Admin | Issue or regenerate credentials by email |
-| GET/POST | `/api/v1/admin/events/:eventId/rounds` | Admin | List or create the next sequential round `{ name }` |
-| GET/POST | `/api/v1/admin/events/:eventId/keys` | Admin | List or create event key `{ value }` |
-| GET/POST | `/api/v1/admin/rounds/:roundId/questions` | Admin | List or add `{ keyId, question }` |
-| PATCH | `/api/v1/admin/rounds/:roundId/patterns/:pattern` | Admin | `{ enabled, maxWinners }` |
-| POST | `/api/v1/admin/rounds/:roundId/tickets/generate` | Admin | Assign persistent 3×9 tickets; requires `Idempotency-Key` |
-| POST | `/api/v1/admin/rounds/:roundId/{ready,start,pause,resume,complete,cancel}` | Admin | Lifecycle transition; requires `Idempotency-Key` |
-| POST | `/api/v1/admin/rounds/:roundId/draws` | Admin | `{ keyId? }`; random when omitted; requires `Idempotency-Key` |
-| POST | `/api/v1/admin/rounds/:roundId/draws/reveal` | Admin | `{ seq }` publishes the question/key |
-| GET | `/api/v1/admin/rounds/:roundId/state` | Admin | Private round state and claims for review |
-| POST | `/api/v1/admin/claims/:claimId/review` | Admin | `{ decision: 'verify'|'reject', reason? }`; requires `Idempotency-Key` |
-| GET | `/api/v1/participant/rounds` | Participant | Own event's sequential rounds and ticket availability |
-| GET | `/api/v1/participant/rounds/:roundId` | Participant | Own assigned ticket, marks, claims, score and revealed draws |
-| POST | `/api/v1/participant/rounds/:roundId/marks` | Participant | `{ keyId }`; requires `Idempotency-Key` |
-| DELETE | `/api/v1/participant/rounds/:roundId/marks/:keyId` | Participant | Clear own mark; requires `Idempotency-Key` |
-| POST | `/api/v1/participant/rounds/:roundId/claims` | Participant | `{ pattern }`; requires `Idempotency-Key` |
-| GET | `/api/v1/public/rounds/:roundId` | Account session | Allowlisted projector state, revealed draws, winners and standings |
+| GET | `/api/v1/admin/participants` | Admin | All participants and credential delivery status |
+| POST | `/api/v1/admin/participants/import` | Admin | CSV text or `{ rows: [...] }`; requires `Idempotency-Key` |
+| POST | `/api/v1/admin/participants/:profileId/credentials` | Admin | Issue or regenerate credentials by email |
 | GET | `/api/v1/admin/dashboard`, `/api/v1/admin/audit` | Admin | Operational snapshot and paginated audit |
 | GET | `/api/v1/super-admin/system` | Super Admin | Safe readiness and migration diagnostics |
-| GET | `/api/v1/super-admin/rounds/:roundId/recovery` | Super Admin | Inspect recovery integrity |
-| POST | `/api/v1/super-admin/rounds/:roundId/recover` | Super Admin | Validate and resume into PAUSED |
 
-Every draw, mark, claim, verification and lifecycle action is checked against the
-authenticated principal and the event/round on the server. Participants can only
-read or mark their own assigned ticket. Marks require a revealed draw; claims use
-persisted manual marks and official game state. Valid claims await Admin review.
-Public state includes revealed questions/keys and verified results only; it omits
-private tickets, participant email addresses, pending claims and future question
-mappings. Realtime updates are invalidations: fetch the matching REST snapshot.
+Participants are imported directly and join a game by code. There are no event
+or round APIs. The server validates each game action against the authenticated
+account, host ownership, ticket, called numbers, and saved manual marks. Claims
+are validated automatically. Answer reveal never marks a ticket automatically.
 
-The admin actions listed as idempotent require an `Idempotency-Key` header of 8–128
-letters, digits, dots, underscores, tildes or hyphens. Replaying the same key and
-payload returns the committed result; reusing it for a different operation or
-payload is rejected. Participant mark saves are also idempotent per request key.
+CSV imports require an `Idempotency-Key` header of 8–128 letters, digits, dots,
+underscores, tildes or hyphens. Replaying the same key and payload returns the
+committed result; reusing the key for a different payload is rejected.
 
 Errors from `/api/v1` use `{ ok:false, error:{ code, message }, requestId }`.
 Validation, authentication, authorization, missing resources, conflicts and
@@ -152,6 +132,12 @@ such as claiming after the game ends return a lifecycle error instead.
 
 ## Socket.IO
 
+Administrator dashboards connect with `auth: { channel: 'admin-dashboard' }`
+and the account session cookie. Members cannot join this channel. After a game
+change commits, the server emits a payload-free `dashboard_changed` invalidation.
+Both dashboard pages refresh the shared catalogue and operations counters on
+this event, room readiness, tab focus, and every 15 seconds as a fallback.
+
 Connect with the normal Socket.IO path `/socket.io` and handshake authentication:
 
 ```ts
@@ -173,14 +159,6 @@ Each connection belongs to one `game:<id>` room. API writes publish invalidation
 after committing. Private mark saves return to the requesting player without a
 room broadcast. Reconnecting clients join again and fetch a fresh snapshot.
 Presence counts connected sockets, not registered players.
-
-For account rounds, connect with `auth: { roundId }` and send the participant's
-HttpOnly cookie as the browser credential (`withCredentials: true`). A public
-projector connects with `auth: { publicRoundId }` and no cookie. Admin principals
-cannot join participant rooms. Both account channels join `round:<id>` and receive
-only `round_changed` invalidations after committed mutations; clients reload the
-role-appropriate account or public REST state. Socket.IO has no client mutation
-events.
 
 There are no client mutation or broadcast handlers. All mutations use the
 validated REST API; emitting a fake `game_changed` from a browser cannot change

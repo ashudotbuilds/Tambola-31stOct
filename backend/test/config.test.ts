@@ -4,6 +4,12 @@ import { readConfig } from '../src/config'
 
 const base = { DATABASE_URL: 'postgresql://user:password@localhost:5432/tambola' }
 
+test('testing-stage production role shortcuts can be explicitly disabled', () => {
+  assert.equal(readConfig({ ...base, NODE_ENV: 'production' }).TEST_ACCOUNTS_ENABLED, true)
+  assert.equal(readConfig({ ...base, TEST_ACCOUNTS_ENABLED: 'false' }).TEST_ACCOUNTS_ENABLED, false)
+  assert.throws(() => readConfig({ ...base, TEST_ACCOUNTS_ENABLED: 'yes' }), /TEST_ACCOUNTS_ENABLED/)
+})
+
 test('deployment config accepts exact origins and complete email settings', () => {
   const config = readConfig({
     ...base,

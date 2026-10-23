@@ -6,9 +6,11 @@ const Host = lazy(() => import('./pages/Host'))
 const Player = lazy(() => import('./pages/Player'))
 const Board = lazy(() => import('./pages/Board'))
 const Admin = lazy(() => import('./pages/Admin'))
+const SuperAdmin = lazy(() => import('./pages/SuperAdmin'))
+const AdminAccounts = lazy(() => import('./pages/AdminAccounts'))
+const Participants = lazy(() => import('./pages/Participants'))
+const Audit = lazy(() => import('./pages/Audit'))
 const ParticipantHome = lazy(() => import('./pages/ParticipantHome'))
-const ParticipantRound = lazy(() => import('./pages/ParticipantRound'))
-const RoundBoard = lazy(() => import('./pages/RoundBoard'))
 
 export function App() {
   return (
@@ -16,9 +18,13 @@ export function App() {
       <Route path="/" element={<Login />} />
       <Route path="/login" element={<Login />} />
       <Route path="/admin" element={<AccountGuard role="admin"><Admin /></AccountGuard>} />
+      <Route path="/super-admin" element={<AccountGuard role="super-admin"><SuperAdmin /></AccountGuard>} />
+      <Route path="/super-admin/admins" element={<AccountGuard role="super-admin"><AdminAccounts /></AccountGuard>} />
+      <Route path="/admin/participants" element={<AccountGuard role="admin"><Participants /></AccountGuard>} />
+      <Route path="/admin/events" element={<Navigate to="/admin/participants" replace />} />
+      <Route path="/admin/rounds" element={<Navigate to="/admin" replace />} />
+      <Route path="/admin/audit" element={<AccountGuard role="admin"><Audit /></AccountGuard>} />
       <Route path="/account" element={<AccountGuard role="member"><ParticipantHome /></AccountGuard>} />
-      <Route path="/account/round/:roundId" element={<AccountGuard role="member"><ParticipantRound /></AccountGuard>} />
-      <Route path="/display/round/:roundId" element={<AccountGuard><RoundBoard /></AccountGuard>} />
       <Route path="/host" element={<AccountGuard role="admin"><Host /></AccountGuard>} />
       <Route path="/play" element={<AccountGuard role="member"><Player /></AccountGuard>} />
       <Route path="/board" element={<AccountGuard role="admin"><Board /></AccountGuard>} />

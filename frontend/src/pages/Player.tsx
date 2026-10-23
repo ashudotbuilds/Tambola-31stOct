@@ -132,7 +132,7 @@ export default function PlayerScreen() {
   const callItem = call ? getTechnicalItem(call.number, customBank) : null
   const isCallRevealed = call ? revealedSeqs.has(call.seq) : false
 
-  // All pending unrevealed calls for this round
+  // All pending unrevealed calls for this game
   const pendingCalls = (state?.calls ?? []).filter((c) => !revealedSeqs.has(c.seq))
 
   const isLight = theme === 'light'
@@ -296,7 +296,7 @@ export default function PlayerScreen() {
       {pendingCalls.length > 1 && (
         <details className="card p-2.5 sm:p-3 text-xs">
           <summary className="font-bold text-amber cursor-pointer">
-            📋 {pendingCalls.length} questions currently active in this round (Click to view all)
+            📋 {pendingCalls.length} questions currently active in this game (Click to view all)
           </summary>
           <div className="mt-2 space-y-1.5">
             {pendingCalls.map((c) => {
