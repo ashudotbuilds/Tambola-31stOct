@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { loginUser } from '@/lib/api'
 import { request } from '@/lib/http'
@@ -15,11 +15,19 @@ export default function Login() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [accounts, setAccounts] = useState<DemoAccount[]>([])
-  useEffect(() => {
-    request<{ accounts: DemoAccount[] }>('/v1/demo/accounts')
-      .then((result) => setAccounts(result.accounts))
-      .catch(() => {})
+  const [accountsLoading, setAccountsLoading] = useState(true)
+  const [accountsError, setAccountsError] = useState<string | null>(null)
+  const loadAccounts = useCallback(async () => {
+    setAccountsLoading(true)
+    setAccountsError(null)
+    try {
+      const result = await request<{ accounts: DemoAccount[] }>('/v1/demo/accounts')
+      setAccounts(result.accounts)
+    } catch {
+      setAccountsError('Testing accounts could not load. Please retry or contact your administrator.')
+    } finally { setAccountsLoading(false) }
   }, [])
+  useEffect(() => { void loadAccounts() }, [loadAccounts])
   async function signIn(id: string, secret: string) {
     setBusy(true)
     setError(null)
@@ -94,12 +102,14 @@ export default function Login() {
       <PlaySteps />
       </div>
       </div>
-      {accounts.length > 0 && (
+      {(accounts.length > 0 || accountsLoading || accountsError) && (
         <section className="mb-10 border-t border-edge pt-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="font-display text-lg font-bold">Testing accounts</h2><span className="eyebrow">Testing access</span></div>
-          <p className="mt-1 text-sm text-slate-400">
+          {accountsLoading && <p role="status" className="mt-3 text-sm text-slate-400">Loading testing accounts…</p>}
+          {accountsError && <div className="mt-3 flex flex-wrap items-center gap-3"><p role="alert" className="text-sm text-rose">{accountsError}</p><button className="btn" type="button" disabled={accountsLoading} onClick={() => void loadAccounts()}>Retry testing accounts</button></div>}
+          {accounts.length > 0 && <p className="mt-1 text-sm text-slate-400">
             Choose an account to sign in. Password: DemoPass123!
-          </p>
+          </p>}
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {accounts.map((account) => (
               <button

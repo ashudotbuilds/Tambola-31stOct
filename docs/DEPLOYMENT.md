@@ -131,6 +131,9 @@ Set `VITE_API_URL` to your Render origin, for example
 `routes` in `frontend/vercel.json` use the deployment environment variable to
 proxy `/api` and `/socket.io` to Render. The filesystem handler serves built
 assets before the final SPA fallback.
+Use no trailing slash: `https://your-api.onrender.com`, not
+`https://your-api.onrender.com/`. The deployment proxy appends `/api` and
+`/socket.io`; a trailing slash causes double-slash paths and backend 404 responses.
 Production browsers connect to their own frontend origin, so HttpOnly account
 cookies work even when third-party cookies are blocked. Socket.IO uses HTTP
 polling through this proxy and continues to deliver live game invalidations.
