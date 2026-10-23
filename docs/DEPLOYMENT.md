@@ -116,7 +116,7 @@ Reference: [Render Express deployment](https://render.com/docs/deploy-node-expre
 ## 3. Vercel frontend
 
 Import the repository into Vercel with **`frontend`** as the Root Directory.
-`frontend/vercel.json` supplies these settings:
+`frontend/vercel.mjs` supplies these settings:
 
 | Setting | Value |
 | --- | --- |
@@ -127,18 +127,25 @@ Import the repository into Vercel with **`frontend`** as the Root Directory.
 | Output directory | `dist` |
 
 Set `VITE_API_URL` to your Render origin, for example
-`https://technical-tambola-api.onrender.com`, with no `/api` suffix. The HTTP
-client adds `/api`; Socket.IO connects directly to the same origin.
+`https://technical-tambola-api.onrender.com`, with no `/api` suffix. Vercel evaluates
+this variable in `frontend/vercel.mjs` to proxy `/api` and `/socket.io` to Render.
+Production browsers connect to their own frontend origin, so HttpOnly account
+cookies work even when third-party cookies are blocked. Socket.IO uses HTTP
+polling through this proxy and continues to deliver live game invalidations.
+Local development connects directly to `VITE_API_URL` (localhost by default).
 
-Vite embeds this variable into the frontend bundle, so rebuild/redeploy after
-changing it. The SPA rewrite lets `/host`, `/play`, and `/board` load directly.
+Redeploy Vercel after changing the backend origin. The final SPA rewrite lets
+`/host`, `/play`, and `/board` load directly. Keep `NODE_ENV=production` on Render;
+HTTPS login requests also receive Secure cookies if that variable is missing.
 
 If you use a preview or custom frontend domain, add its exact origin to
 Render's `WEB_ORIGINS`, separated by commas, and redeploy the API. Broad wildcard
 origin matching is intentionally absent. A custom domain uses fresh browser
 storage; old sessions remain on the origin that issued them.
 
-Reference: [Vercel Vite guide](https://vercel.com/docs/frameworks/frontend/vite),
+Reference: [Vercel programmatic configuration](https://vercel.com/docs/project-configuration/vercel-ts),
+[Vercel rewrites](https://vercel.com/docs/routing/rewrites),
+[Vercel Vite guide](https://vercel.com/docs/frameworks/frontend/vite),
 [Vite environment variables](https://vite.dev/guide/env-and-mode).
 
 ## First deployment order

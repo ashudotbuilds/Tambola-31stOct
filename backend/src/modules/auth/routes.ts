@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, type Request, type CookieOptions } from 'express'
 import rateLimit from 'express-rate-limit'
 import type { AuthService } from './service'
 import { extractSessionToken, requireAuth, requireRole } from './middleware'
@@ -7,6 +7,12 @@ import { z } from 'zod'
 import { verifyPassword, hashPassword } from './password'
 import { findUserById, recordAudit } from './repository'
 import { ensure, AppError } from '../../errors'
+
+function sessionCookie(req: Request): CookieOptions {
+  // Also handle manually configured HTTPS deployments without NODE_ENV set.
+  const secure = req.secure || process.env.NODE_ENV === 'production' || req.get('origin')?.startsWith('https://') === true
+  return { httpOnly: true, secure, sameSite: secure ? 'none' : 'lax', path: '/' }
+}
 
 export function authRoutes(auth: AuthService) {
   const router = Router()
@@ -107,11 +113,7 @@ export function authRoutes(auth: AuthService) {
 
       // Set HttpOnly session cookie
       res.cookie('tt_session', result.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        // Vercel and Render use different registrable domains in production.
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        path: '/',
+        ...sessionCookie(req),
         maxAge: 7 * 24 * 60 * 60 * 1000,
       })
 
@@ -135,12 +137,7 @@ export function authRoutes(auth: AuthService) {
       if (token) {
         await auth.logout(token, req.auth?.user.id)
       }
-      res.clearCookie('tt_session', {
-        path: '/',
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      })
+      res.clearCookie('tt_session', sessionCookie(req))
       res.json({ ok: true })
     } catch (err) {
       next(err)

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
-import { API_URL } from '@/lib/config'
+import { API_URL, SOCKET_OPTIONS } from '@/lib/config'
 import { getGameState } from '@/lib/api'
 import type { CallRow, ClaimResultEvent, ClaimType, GameState, NumberCalledEvent, StatusChangedEvent, TicketUpdatedEvent } from '@/lib/types'
 
@@ -69,7 +69,7 @@ export function useGameRoom(gameId: string | null, token: string | null | undefi
     setConnected(0)
     if (!gameId) return
     void load()
-    const socket = io(API_URL, { withCredentials: true, auth: { gameId, ...(token ? { token } : {}) } })
+    const socket = io(API_URL, { ...SOCKET_OPTIONS, withCredentials: true, auth: { gameId, ...(token ? { token } : {}) } })
     socket.on('connect', () => setConnection('connecting'))
     socket.on('room_ready', () => { setConnection('live'); void load() })
     socket.on('disconnect', () => setConnection('offline'))

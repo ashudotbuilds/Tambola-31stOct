@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { getAdminDashboard, listAccountGames, type AdminDashboard } from '@/lib/api'
-import { API_URL } from '@/lib/config'
+import { API_URL, SOCKET_OPTIONS } from '@/lib/config'
 
 export function useAdminDashboard(enabled: boolean) {
   const [games, setGames] = useState<Awaited<ReturnType<typeof listAccountGames>>['games']>([])
@@ -32,7 +32,7 @@ export function useAdminDashboard(enabled: boolean) {
     }
     const update = () => { if (active) void load() }
     refreshRef.current = update
-    const socket = io(API_URL, { withCredentials: true, auth: { channel: 'admin-dashboard' } })
+    const socket = io(API_URL, { ...SOCKET_OPTIONS, withCredentials: true, auth: { channel: 'admin-dashboard' } })
     socket.on('room_ready', update)
     socket.on('dashboard_changed', update)
     const visible = () => { if (document.visibilityState === 'visible') update() }

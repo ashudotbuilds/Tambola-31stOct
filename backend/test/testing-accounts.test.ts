@@ -27,6 +27,21 @@ test('production shortcuts provision real roles, survive redeployment, and disab
     assert.equal(response.status, 200)
     assert.equal(response.headers.get('cache-control'), 'no-store')
     assert.deepEqual((await response.json() as { accounts: unknown }).accounts, TESTING_ACCOUNTS)
+    // A manually configured Render service can omit NODE_ENV. HTTPS browser
+    // requests must still receive usable Secure cookies in that case.
+    delete process.env.NODE_ENV
+    const login = await fetch(`http://127.0.0.1:${address.port}/api/v1/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://tambola.example' },
+      body: JSON.stringify({ email: TESTING_ACCOUNTS[0].id, password: 'DemoPass123!' }),
+    })
+    assert.equal(login.status, 200)
+    const cookie = login.headers.get('set-cookie')!
+    assert.match(cookie, /HttpOnly/)
+    assert.match(cookie, /; Secure/)
+    assert.match(cookie, /SameSite=None/)
+    const me = await fetch(`http://127.0.0.1:${address.port}/api/v1/auth/me`, { headers: { Cookie: cookie.split(';')[0] } })
+    assert.equal(me.status, 200)
+    process.env.NODE_ENV = 'production'
     const sessions: Awaited<ReturnType<NonNullable<typeof application>['auth']['login']>>[] = []
     for (const account of TESTING_ACCOUNTS) {
       const session: Awaited<ReturnType<NonNullable<typeof application>['auth']['login']>> = await application.auth.login(account.id, 'DemoPass123!')
