@@ -8,7 +8,7 @@ public landing page. The sign-in page displays ten testing account buttons.
 | --- | --- | --- |
 | Super Admin | `superadmin` | `DemoPass123!` |
 | Admin | `admin1`, `admin2`, `admin3` | `DemoPass123!` |
-| Member | `user1` through `user6` | `DemoPass123!` |
+| Member | `user1` through `user20` | `DemoPass123!` |
 
 The demo runs an isolated in-memory PGlite database. It does not read the cloud
 database connection or send email. Data, profile changes, and games reset when

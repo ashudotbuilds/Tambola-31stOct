@@ -88,7 +88,7 @@ manually configured Render services apply pending migrations even when their
 pre-deploy command is unset. Repeated runs verify checksums and skip applied files.
 
 During the current testing stage, `TEST_ACCOUNTS_ENABLED=true` (the default) keeps
-the Super Admin, Admin 1–3, and Member 1–6 sign-in buttons available in production.
+the Super Admin, Admin 1–3, and Member 1–20 sign-in buttons available in production.
 The backend creates persistent test accounts in a reserved namespace on startup,
 using the existing database schema; redeploying preserves their IDs and games.
 The shared test password is `DemoPass123!`. These are public login shortcuts with

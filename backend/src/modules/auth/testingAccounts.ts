@@ -6,7 +6,7 @@ export interface TestingAccount { id: string; name: string; email: string; role:
 export const TESTING_ACCOUNTS: TestingAccount[] = [
   { id: 'tt-test-superadmin', name: 'Super Admin', email: 'superadmin@testing.tambola.invalid', role: 'SUPER_ADMIN' },
   ...Array.from({ length: 3 }, (_, i) => ({ id: `tt-test-admin${i + 1}`, name: `Admin ${i + 1}`, email: `admin${i + 1}@testing.tambola.invalid`, role: 'ADMIN' as const })),
-  ...Array.from({ length: 6 }, (_, i) => ({ id: `tt-test-user${i + 1}`, name: `Member ${i + 1}`, email: `user${i + 1}@testing.tambola.invalid`, role: 'PARTICIPANT' as const })),
+  ...Array.from({ length: 20 }, (_, i) => ({ id: `tt-test-user${i + 1}`, name: `Member ${i + 1}`, email: `user${i + 1}@testing.tambola.invalid`, role: 'PARTICIPANT' as const })),
 ]
 
 // Temporary public testing accounts use normal password hashing and sessions.
