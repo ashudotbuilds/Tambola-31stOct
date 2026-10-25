@@ -1,0 +1,25 @@
+{
+  "name": "Technical Tambola API",
+  "description": "Express and Socket.IO game API. Frontend stays on Vercel; PostgreSQL stays on Neon.",
+  "repository": "https://github.com/ashudotbuilds/Tambola-31stOct",
+  "stack": "heroku-24",
+  "buildpacks": [{ "url": "heroku/nodejs" }],
+  "formation": { "web": { "quantity": 1, "size": "basic" } },
+  "env": {
+    "DATABASE_URL": { "description": "Existing Neon pooled PostgreSQL URL, including its SSL parameters." },
+    "MIGRATION_DATABASE_URL": { "description": "Optional direct Neon URL for release migrations. Falls back to DATABASE_URL.", "required": false },
+    "WEB_ORIGINS": { "description": "Exact HTTPS Vercel frontend origin, without a trailing slash. Comma-separate multiple allowed origins." },
+    "NODE_ENV": { "value": "production" },
+    "HOST": { "value": "0.0.0.0" },
+    "TRUST_PROXY_HOPS": { "value": "1" },
+    "DATABASE_POOL_MAX": { "value": "10" },
+    "TEST_ACCOUNTS_ENABLED": { "description": "Temporary public testing shortcuts. Set false after real admin/player accounts are ready.", "value": "true" },
+    "SUPER_ADMIN_BOOTSTRAP_SECRET": { "description": "Optional existing Super Admin bootstrap secret; at least 32 characters.", "required": false },
+    "POSTHOG_PROJECT_KEY": { "description": "Optional phc_ project token, matching the frontend project.", "required": false },
+    "POSTHOG_HOST": { "description": "Use the ingestion region belonging to the project.", "value": "https://us.i.posthog.com" },
+    "EMAIL_API_URL": { "description": "Optional credential email API URL; configure together with EMAIL_API_KEY and EMAIL_FROM.", "required": false },
+    "EMAIL_API_KEY": { "description": "Optional email API credential; configure all three email variables together.", "required": false },
+    "EMAIL_FROM": { "description": "Optional sender email; configure all three email variables together.", "required": false }
+  },
+  "success_url": "/ready"
+}

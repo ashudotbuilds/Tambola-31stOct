@@ -17,7 +17,7 @@ simulator, sound cues, and game flow are retained.
 | Layer | Technology | Hosting |
 | --- | --- | --- |
 | Frontend | React 19, Vite, TypeScript, React Router, Tailwind CSS | Vercel |
-| Backend | Express 5, TypeScript, Socket.IO | Render |
+| Backend | Express 5, TypeScript, Socket.IO | Render or Heroku |
 | Database | PostgreSQL via `pg`, versioned SQL migrations | Neon |
 | Common contracts | Types, claim rules, question bank copied into each app | No cross-folder dependency |
 
@@ -26,9 +26,13 @@ are configured; Vercel and Render deployment are handled manually. See
 [the current deployment setup](docs/DEPLOYMENT.md#current-setup) for details.
 InsForge is no longer an application dependency.
 
+For Heroku, deploy the repository root with the included `Procfile` and `app.json`.
+The frontend stays on Vercel. See [the Heroku deployment guide](docs/HEROKU.md).
+
 ## Quick start
 
-Use Node.js 22.12+ and npm. Node 22 LTS is used by the deployment configuration.
+Use Node.js 24 LTS and npm for the root helpers and Heroku build. The independent
+frontend/backend apps still support Node.js 22.12+; the Render Blueprint uses Node 22.
 Run all commands below from the repository root.
 
 ```sh

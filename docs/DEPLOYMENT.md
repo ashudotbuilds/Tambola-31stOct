@@ -1,5 +1,9 @@
 # Deployment
 
+Heroku is also supported for the API. See [HEROKU.md](HEROKU.md) for the root
+buildpack setup, release migrations, required config vars, and Vercel proxy switch.
+The Render instructions below remain available as an alternative.
+
 The intended first deployment is Vercel for the frontend, Render for the API, and
 Neon for PostgreSQL. This guide prepares those services; no cloud resources are
 created by running the build or tests.

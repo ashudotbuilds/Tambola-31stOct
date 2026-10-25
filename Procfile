@@ -1,2 +1,2 @@
-release: npm --prefix backend run db:migrate:prod
-web: npm --prefix backend start
+release: node backend/dist/migrate.js
+web: node backend/dist/index.js

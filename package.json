@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.12.0"
+    "node": "24.x"
   },
   "scripts": {
     "dev:demo": "concurrently -k -n backend,frontend \"npm --prefix backend run dev:demo\" \"npm --prefix frontend run dev\"",
@@ -16,6 +16,7 @@
     "build:web": "npm --prefix frontend run build",
     "build:api": "npm --prefix backend run build",
     "heroku-postbuild": "npm run check:shared && npm ci --prefix backend --include=dev && npm --prefix backend run build && npm prune --prefix backend --omit=dev",
+    "check:heroku": "node scripts/check-heroku-build.mjs",
     "start": "npm --prefix backend start",
     "typecheck": "npm --prefix backend run typecheck && npm --prefix frontend run typecheck",
     "test": "npm run check:shared && npm --prefix backend test && npm run test:marks",
