@@ -34,9 +34,9 @@ try {
     await root.page.getByRole('heading', { level: 1, name: heading, exact: true }).waitFor()
   }
   await root.page.goto(origin + '/admin/audit')
-  await root.page.getByPlaceholder('Exact action').fill('LOGIN_SUCCESS')
+  await root.page.getByLabel('Activity', { exact: true }).selectOption('LOGIN_SUCCESS')
   await root.page.getByRole('button', { name: 'Apply filters', exact: true }).click()
-  await root.page.getByText('LOGIN_SUCCESS', { exact: false }).first().waitFor()
+  await root.page.getByRole('heading', { name: 'Logged in', exact: true }).first().waitFor()
   await root.page.getByRole('link', { name: 'Create admin', exact: true }).click()
   await root.page.waitForURL('**/super-admin/admins')
   await root.page.getByRole('heading', { level: 1, name: 'Create admin', exact: true }).waitFor()

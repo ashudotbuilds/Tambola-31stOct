@@ -43,3 +43,6 @@ yarn-error.log*
 .roo
 .trae
 .windsurf
+
+# Local screenshots for the gameplay UI verification
+artifacts/gameplay-update/
