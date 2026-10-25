@@ -7,6 +7,7 @@ import './styles/fonts.css'
 import './styles/globals.css'
 import { startTelemetry } from './lib/telemetry'
 import { TelemetryNavigation } from './components/TelemetryNavigation'
+import { Analytics } from '@vercel/analytics/react'
 
 startTelemetry()
 
@@ -14,6 +15,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <TelemetryNavigation />
+      <Analytics />
       <ThemeProvider><App /></ThemeProvider>
     </BrowserRouter>
   </StrictMode>,
