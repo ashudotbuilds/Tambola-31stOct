@@ -113,6 +113,9 @@ export class AuthService {
       throw new AppError(401, 'Invalid email or password')
     }
 
+    if (user.status !== 'ACTIVE') {
+      await recordAudit(this.db, { actorId: user.id, action: 'LOGIN_FAILED', resourceType: 'user', metadata: { reason: 'Account is inactive or suspended' }, ipAddress: context.ip, userAgent: context.userAgent })
+    }
     ensure(user.status === 'ACTIVE', 403, 'Account is inactive or suspended')
 
     // Determine principal
@@ -208,15 +211,18 @@ export class AuthService {
     }
   }
 
-  async logout(rawToken: string, actorId?: string): Promise<{ ok: true }> {
+  async logout(rawToken: string, actorId?: string, context: { ip?: string; userAgent?: string } = {}): Promise<{ ok: true }> {
     if (rawToken) {
       const tokenHash = hashSessionToken(rawToken)
+      const active = await findActiveSession(this.db, tokenHash)
+      actorId = active?.user.id ?? actorId
       await revokeSession(this.db, tokenHash)
       if (actorId) {
         await recordAudit(this.db, {
           actorId,
           action: 'LOGOUT',
           resourceType: 'session',
+          ipAddress: context.ip, userAgent: context.userAgent,
         })
       }
     }

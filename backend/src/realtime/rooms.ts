@@ -3,6 +3,7 @@ import type { GameService } from '../modules/games/service'
 import type { AuthService } from '../modules/auth/service'
 import { parse as parseCookies } from 'cookie'
 import { z } from 'zod'
+import { recordAudit } from '../modules/auth/repository'
 
 export const roomName = (gameId: string) => `game:${gameId}`
 export const adminRoomName = 'admin:dashboard'
@@ -25,9 +26,13 @@ export function attachRooms(io: Server, games: GameService, auth?: AuthService) 
         const accountToken = parseCookies(socket.request.headers.cookie ?? '').tt_session
         if (!auth || !accountToken) return next(new Error('Account session is required'))
         const account = await auth.authenticate(accountToken)
+        socket.data.actorId = account.user.id
         if (account.principal.type === 'PARTICIPANT') {
           const { rows } = await games.db.query('SELECT id FROM game_players WHERE game_id=$1 AND account_user_id=$2', [gameRequest.data.gameId, account.user.id])
-          if (!rows.length) return next(new Error('Join this game first'))
+          if (!rows.length) {
+            await recordAudit(games.db, { actorId: account.user.id, action: 'GAME_CONNECTION_DENIED', resourceType: 'game', resourceId: gameRequest.data.gameId, metadata: { reason: 'Account has not joined this game' } })
+            return next(new Error('Join this game first'))
+          }
         }
         await games.state(gameRequest.data.gameId, gameRequest.data.token)
         socket.data.channel = 'game'
@@ -49,8 +54,19 @@ export function attachRooms(io: Server, games: GameService, auth?: AuthService) 
     await socket.join(room)
     const presence = () => io.to(room).emit('presence', io.sockets.adapter.rooms.get(room)?.size ?? 0)
     presence()
-    socket.emit('room_ready')
-    socket.on('disconnect', presence)
+    const actorId = socket.data.actorId as string
+    const log = async (action: string, metadata: Record<string, unknown> = {}) => {
+      try { await recordAudit(games.db, { actorId, action, resourceType: 'game', resourceId: socket.data.gameId,
+        metadata, ipAddress: socket.handshake.address, userAgent: socket.handshake.headers['user-agent'] }) }
+      catch { console.error('Could not record game connection audit') }
+    }
+    socket.on('disconnect', reason => { presence(); void log('GAME_DISCONNECTED', { reason }) })
+    try {
+      const { rows } = await games.db.query(`SELECT id FROM audit_logs WHERE resource_type='game' AND resource_id=$1 AND actor_id=$2 AND action IN ('GAME_CONNECTED','GAME_RECONNECTED','GAME_ADDITIONAL_CONNECTION') LIMIT 1`, [socket.data.gameId, actorId])
+      const connections = [...io.sockets.sockets.values()].filter(s => s.data.gameId === socket.data.gameId && s.data.actorId === actorId).length
+      await log(connections > 1 ? 'GAME_ADDITIONAL_CONNECTION' : rows.length ? 'GAME_RECONNECTED' : 'GAME_CONNECTED', { connections })
+    } catch { console.error('Could not inspect game connection history') }
+    if (socket.connected) socket.emit('room_ready')
     // There are deliberately no client publish/mutation handlers.
   })
 }

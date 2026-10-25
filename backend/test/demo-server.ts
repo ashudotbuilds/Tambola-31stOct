@@ -50,9 +50,10 @@ const application = createApplication(db, {
   ]),
   demoAccounts: accounts,
 })
-application.server.listen(3001, '127.0.0.1', () =>
+const port = Number(process.env.DEMO_PORT ?? 3001)
+application.server.listen(port, '127.0.0.1', () =>
   console.log(
-    'Local demo API ready on http://127.0.0.1:3001 (data resets on restart)',
+    `Local demo API ready on http://127.0.0.1:${port} (data resets on restart)`,
   ),
 )
 process.on('SIGINT', () =>

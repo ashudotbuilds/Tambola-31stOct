@@ -1,4 +1,3 @@
-import { randomInt } from 'node:crypto'
 import { isClaimEligible, pointsFor } from '../../shared/claims'
 import type { ClaimResult, ClaimType } from '../../shared/types'
 import type { Database } from '../../db/database'
@@ -29,17 +28,13 @@ export class ClaimService {
       const called = new Set(calls.map(c => c.number))
       const effective = new Set(ticket.marked.filter(n => called.has(n)))
       if (!isClaimEligible(claim, ticket.cells, effective, new Set(ticket.cut))) {
-        const penalty = game.settings.wrong_claim_penalty ?? 10
-        const candidates = ticket.marked.filter(n => !ticket.cut.includes(n))
-        const cut = candidates.length ? candidates[randomInt(candidates.length)] : null
-        if (cut !== null) await db.query('UPDATE tickets SET cut = array_append(cut, $2), marked = array_remove(marked, $2) WHERE id = $1', [ticket.id, cut])
         const { rows: [updated] } = await db.query<{ score: number; wrong_claims: number }>(
-          'UPDATE game_players SET score = greatest(0, score - $2), wrong_claims = wrong_claims + 1 WHERE id = $1 RETURNING score, wrong_claims', [player.id, penalty],
+          'UPDATE game_players SET wrong_claims = wrong_claims + 1 WHERE id = $1 RETURNING score, wrong_claims', [player.id],
         )
-        await db.query("INSERT INTO claims (game_id, player_id, claim_type, status, points, reason) VALUES ($1,$2,$3,'rejected',$4,$5)", [gameId, player.id, claim, -penalty, 'Not valid on your ticket'])
-        await recordAudit(db, { actorId: player.account_user_id, action: 'GAME_CLAIM_REJECTED', resourceType: 'game', resourceId: gameId, metadata: { pattern: claim, status: 'rejected' } })
-        return { ok: true, accepted: false, status: 'rejected', reason: 'Not valid on your ticket', points: -penalty,
-          penalty, cut, score: updated.score, wrong_claims: updated.wrong_claims }
+        await db.query("INSERT INTO claims (game_id, player_id, claim_type, status, points, reason) VALUES ($1,$2,$3,'rejected',0,$4)", [gameId, player.id, claim, 'Incorrect claim: pattern is not complete with officially called items'])
+        await recordAudit(db, { actorId: player.account_user_id, action: 'GAME_CLAIM_REJECTED', resourceType: 'game', resourceId: gameId, metadata: { pattern: claim, status: 'rejected', points: 0, warningCount: updated.wrong_claims, suspicious: updated.wrong_claims >= 3, reason: 'Pattern not complete with officially called items' } })
+        return { ok: true, accepted: false, status: 'rejected', reason: 'Incorrect claim. Check your pattern and called items. The host has been notified. No points deducted or cells cut.', points: 0,
+          penalty: 0, cut: null, score: updated.score, wrong_claims: updated.wrong_claims }
       }
 
       const points = pointsFor(claim, game.settings)
@@ -50,7 +45,7 @@ export class ClaimService {
       } else if (claim === 'second_full_house') {
         await db.query("UPDATE games SET status = 'finished', finished_at = now() WHERE id = $1", [gameId])
       }
-      await recordAudit(db, { actorId: player.account_user_id, action: 'GAME_CLAIM_ACCEPTED', resourceType: 'game', resourceId: gameId, metadata: { pattern: claim, status: 'accepted' } })
+      await recordAudit(db, { actorId: player.account_user_id, action: 'GAME_CLAIM_ACCEPTED', resourceType: 'game', resourceId: gameId, metadata: { pattern: claim, status: 'accepted', points, score: updated.score } })
       return { ok: true, accepted: true, status: 'accepted', reason: null, points, score: updated.score }
     })
   }

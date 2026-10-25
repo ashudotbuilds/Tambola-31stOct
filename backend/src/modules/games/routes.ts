@@ -17,7 +17,7 @@ function bearer(req: Request, required = true): string | undefined {
   return match[1]
 }
 
-export function gameRoutes(games: GameService, claims: ClaimService, changed: (gameId: string) => void) {
+export function gameRoutes(games: GameService, claims: ClaimService, changed: (gameId: string, deleted?: boolean) => void) {
   const router = Router()
   const entryLimit = rateLimit({ windowMs: 60_000, limit: 150, standardHeaders: 'draft-7', legacyHeaders: false,
     message: { ok: false, error: 'Too many requests. Please wait a minute.' } })
@@ -43,6 +43,7 @@ export function gameRoutes(games: GameService, claims: ClaimService, changed: (g
       COALESCE(u.name,'Administrator') AS host_name,
       (g.account_user_id=$1 OR $2) AS can_manage
       FROM games g LEFT JOIN users u ON u.id=g.account_user_id
+      WHERE g.deleted_at IS NULL
       ORDER BY g.created_at DESC,g.id DESC LIMIT 100`,[req.auth!.user.id,req.auth!.principal.type==='SUPER_ADMIN'])
     res.json({ok:true,games:rows})
   })
@@ -77,30 +78,40 @@ export function gameRoutes(games: GameService, claims: ClaimService, changed: (g
       next()
     } catch (error) { next(error) }
   })
+  router.delete('/:id', async (req, res) => {
+    const { code } = validate.deleteBody.parse(req.body)
+    const result = await games.remove(String(req.params.id), req.auth!.user.id, req.auth!.principal.type === 'SUPER_ADMIN', code)
+    changed(String(req.params.id), true); res.json(result)
+  })
   router.get('/:id', async (req, res) => {
     res.json(await games.state(String(req.params.id), bearer(req, false)))
   })
   router.post('/:id/start', async (req, res) => {
-    const result = await games.start(String(req.params.id), bearer(req)!)
+    const result = await games.start(String(req.params.id), bearer(req)!, req.auth!.user.id)
     changed(String(req.params.id)); res.json(result)
   })
   router.post('/:id/calls', async (req, res) => {
-    const result = await games.draw(String(req.params.id), bearer(req)!)
+    const result = await games.draw(String(req.params.id), bearer(req)!, req.auth!.user.id)
     changed(String(req.params.id)); res.json(result)
   })
   router.patch('/:id/status', async (req, res) => {
     const { status } = validate.statusBody.parse(req.body)
-    const result = await games.status(String(req.params.id), bearer(req)!, status)
+    const result = await games.status(String(req.params.id), bearer(req)!, status, req.auth!.user.id)
+    changed(String(req.params.id)); res.json(result)
+  })
+  router.put('/:id/display', async (req, res) => {
+    const { seq } = validate.displayBody.parse(req.body)
+    const result = await games.display(String(req.params.id), bearer(req)!, seq, req.auth!.user.id)
     changed(String(req.params.id)); res.json(result)
   })
   router.put('/:id/reveals', async (req, res) => {
     const { seqs } = validate.revealBody.parse(req.body)
-    const result = await games.reveal(String(req.params.id), bearer(req)!, seqs)
+    const result = await games.reveal(String(req.params.id), bearer(req)!, seqs, req.auth!.user.id)
     changed(String(req.params.id)); res.json(result)
   })
   router.put('/:id/bank', async (req, res) => {
     const { bank } = validate.bankBody.parse(req.body)
-    const result = await games.bank(String(req.params.id), bearer(req)!, bank)
+    const result = await games.bank(String(req.params.id), bearer(req)!, bank, req.auth!.user.id)
     changed(String(req.params.id)); res.json(result)
   })
   router.put('/:id/marks', async (req, res) => {

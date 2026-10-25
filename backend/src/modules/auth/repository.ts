@@ -222,8 +222,9 @@ export async function recordAudit(
   },
 ): Promise<AuditLogRecord> {
   const { rows } = await client.query<AuditLogRecord>(
-    `INSERT INTO audit_logs (actor_id, action, resource_type, resource_id, metadata, ip_address, user_agent)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO audit_logs (actor_id, action, resource_type, resource_id, metadata, ip_address, user_agent, actor_name, actor_email)
+     VALUES ($1, $2, $3, $4, $5, $6, $7,
+       (SELECT name FROM users WHERE id = $1), (SELECT email FROM users WHERE id = $1))
      RETURNING *`,
     [
       audit.actorId ?? null,

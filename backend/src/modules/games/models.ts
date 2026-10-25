@@ -10,6 +10,7 @@ export interface GameRecord {
   settings: Settings
   paused_from_status: GameStatus | null
   created_at: Date
+  deleted_at?: Date | string | null
 }
 
 export interface PlayerRecord {

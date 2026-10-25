@@ -149,10 +149,10 @@ test('migration application is repeatable and tracked', async () => {
     'applied 004_round_content_tickets.sql', 'applied 005_idempotency.sql',
     'applied 006_credential_delivery.sql', 'applied 007_admin_credential_delivery.sql',
     'applied 008_round_recovery.sql',
-    'applied 009_game_accounts.sql', 'applied 010_login_ids.sql',
+    'applied 009_game_accounts.sql', 'applied 010_login_ids.sql', 'applied 011_audit_identity_and_game_deletion.sql',
   ])
   const { rows } = await db.query<{ count: number }>('SELECT count(*)::int AS count FROM schema_migrations')
-  assert.equal(rows[0].count, 10)
+  assert.equal(rows[0].count, 11)
 })
 
 test('HTTP: sessions, privacy, authorization, custom bank, join validation and lifecycle', async () => {
@@ -200,7 +200,7 @@ test('HTTP: sessions, privacy, authorization, custom bank, join validation and l
   assert.notEqual(raw[0].host_token_hash, host.host_token)
 })
 
-test('claims: manual and official marks, penalties, concurrent winners and both full houses', async () => {
+test('claims: manual and official marks, warning-only rejection, concurrent winners and both full houses', async () => {
   const host = await create()
   const first = await join(host.code, 'First')
   const second = await join(host.code, 'Second')
@@ -211,13 +211,21 @@ test('claims: manual and official marks, penalties, concurrent winners and both 
   await db.query('UPDATE tickets SET cells = $1 WHERE player_id = $2', [JSON.stringify(firstState.me!.ticket), second.player_id])
   await application.games.start(host.game_id, host.host_token)
   await application.games.marks(host.game_id, first.player_token, numbers)
+  // Even games saved with the old penalty setting must use warning-only rules.
+  await db.query("UPDATE games SET settings = jsonb_set(settings, '{wrong_claim_penalty}', '10'::jsonb) WHERE id = $1", [host.game_id])
+  await db.query('UPDATE game_players SET score = 40 WHERE id = $1', [first.player_id])
   const invalid = await application.claims.submit(host.game_id, first.player_token, 'early_five')
   assert.equal(invalid.accepted, false) // pre-marking uncalled numbers cannot win
-  assert.equal(invalid.penalty, 10)
-  assert.ok(invalid.cut)
-  assert.equal((await application.games.state(host.game_id, first.player_token)).me!.wrong_claims, 1)
-  assert.equal((await application.games.marks(host.game_id, first.player_token, numbers)).marked.includes(invalid.cut!), false)
-  await db.query("UPDATE tickets SET cut = '{}', marked = '{}' WHERE player_id = $1", [first.player_id])
+  assert.equal(invalid.penalty, 0)
+  assert.equal(invalid.cut, null)
+  assert.equal(invalid.points, 0)
+  const warned = await application.games.state(host.game_id, first.player_token)
+  assert.equal(warned.me!.wrong_claims, 1)
+  assert.equal(warned.me!.score, 40, 'An incorrect claim preserves a nonzero score')
+  assert.deepEqual(warned.me!.marked, numbers, 'An incorrect claim preserves marks')
+  assert.deepEqual(warned.me!.cut, [], 'An incorrect claim never cuts a cell')
+  const hostView = await application.games.state(host.game_id, host.player_token)
+  assert.ok(hostView.claims.some(c => c.player_id === first.player_id && c.status === 'rejected' && c.points === 0), 'The host sees the warning in the claim feed')
   await db.query(`INSERT INTO game_calls (game_id, seq, number, clue)
     SELECT $1, n, n, 'Fixture clue' FROM generate_series(1,90) n`, [host.game_id])
   await db.query('UPDATE games SET next_seq = 91 WHERE id = $1', [host.game_id])
@@ -308,4 +316,151 @@ test('Admins can list and restore their games; members cannot restore a host ses
   assert.notEqual(restored.host_token,host.host_token)
   await api(`/api/games/${host.game_id}/start`,'POST',undefined,host.host_token,403)
   await api(`/api/games/${host.game_id}/start`,'POST',undefined,restored.host_token)
+})
+
+
+test('question batches persist through partial reveals and reset only on the next draw after full reveal', async () => {
+  const host = await create()
+  const member = await join(host.code, 'Batch player')
+  await application.games.start(host.game_id, host.host_token)
+  for (let i = 0; i < 5; i++) await application.games.draw(host.game_id, host.host_token)
+  await application.games.reveal(host.game_id, host.host_token, [1, 2])
+  let state = await application.games.state(host.game_id, member.player_token)
+  assert.equal(state.settings.question_batch_start, 1)
+  await application.games.draw(host.game_id, host.host_token)
+  state = await application.games.state(host.game_id, member.player_token)
+  assert.equal(state.settings.question_batch_start, 1, 'Partial reveal keeps the entire batch')
+  await application.games.reveal(host.game_id, host.host_token, [3, 4, 5, 6])
+  state = await application.games.state(host.game_id, member.player_token)
+  assert.equal(state.settings.question_batch_start, 1, 'Answers stay visible until the next draw')
+  await application.games.draw(host.game_id, host.host_token)
+  state = await application.games.state(host.game_id, member.player_token)
+  assert.equal(state.settings.question_batch_start, 7)
+  assert.deepEqual(state.calls.filter(c => c.seq >= state.settings.question_batch_start!).map(c => c.seq), [7])
+  assert.equal(state.calls.length, 7, 'Historical calls remain authoritative for claim validation')
+  await application.games.reveal(host.game_id, host.host_token, [1])
+  assert.equal((await application.games.state(host.game_id)).settings.question_batch_start, 7, 'Reviewing old answers does not reset a batch')
+})
+
+
+test('host can show an existing question to everyone without changing game progress', async () => {
+  const host = await create()
+  const member = await join(host.code, 'Replay player')
+  await api(`/api/games/${host.game_id}/start`, 'POST', undefined, host.host_token)
+  for (let i = 0; i < 3; i++) await api(`/api/games/${host.game_id}/calls`, 'POST', undefined, host.host_token)
+  await api(`/api/games/${host.game_id}/reveals`, 'PUT', { seqs: [1] }, host.host_token)
+  const before = await application.games.state(host.game_id, member.player_token)
+  await api(`/api/games/${host.game_id}/display`, 'PUT', { seq: 1 }, member.player_token, 403)
+  await api(`/api/games/${host.game_id}/display`, 'PUT', { seq: 4 }, host.host_token, 400)
+  await api(`/api/games/${host.game_id}/display`, 'PUT', { seq: 1.5 }, host.host_token, 400)
+  const socket = connect(base, { autoConnect: false, extraHeaders: { Cookie: adminCookie }, auth: { gameId: host.game_id, token: host.player_token } })
+  try {
+    const ready = event(socket, 'room_ready'); socket.connect(); await ready
+    const changed = event(socket, 'game_changed')
+    await api(`/api/games/${host.game_id}/display`, 'PUT', { seq: 1 }, host.host_token)
+    await changed
+    for (const token of [undefined, host.player_token, member.player_token]) {
+      const selected = await application.games.state(host.game_id, token)
+      assert.equal(selected.settings.display_seq, 1)
+      assert.deepEqual(selected.calls, before.calls)
+      assert.deepEqual(selected.settings.revealed_seqs, before.settings.revealed_seqs)
+      assert.equal(selected.settings.question_batch_start, before.settings.question_batch_start)
+      if (token === member.player_token) assert.deepEqual(selected.me, before.me)
+    }
+    await api(`/api/games/${host.game_id}/display`, 'PUT', { seq: null }, host.host_token)
+    assert.equal((await application.games.state(host.game_id)).settings.display_seq, null)
+    await api(`/api/games/${host.game_id}/display`, 'PUT', { seq: 2 }, host.host_token)
+    await api(`/api/games/${host.game_id}/calls`, 'POST', undefined, host.host_token)
+    const after = await application.games.state(host.game_id)
+    assert.equal(after.settings.display_seq, null, 'A new draw returns everyone to live')
+    assert.equal(after.calls.length, 4)
+  } finally { socket.disconnect() }
+})
+
+
+test('readable per-game audit preserves identity, activity, review flags and cursor isolation', async () => {
+  const host = await create()
+  const member = await join(host.code, 'Audit member')
+  const other = await create()
+  await application.games.start(host.game_id, host.host_token)
+  const actor = await createUser(db, 'audit.actor@test.local', passwordHash, 'Audit operator')
+  await createAdminProfile(db, actor.id, 'SUPER_ADMIN')
+  await application.games.draw(host.game_id, host.host_token, actor.id)
+  await db.query("UPDATE users SET name='Changed name',email='changed@test.local' WHERE id=$1", [actor.id])
+  for (let i = 0; i < 3; i++) await api(`/api/games/${host.game_id}/claims`, 'POST', { claim: 'early_five' }, member.player_token)
+  await api(`/api/games/${host.game_id}/start`, 'POST', undefined, member.player_token, 403)
+  const socket = connect(base, { autoConnect: false, extraHeaders: { Cookie: adminCookie }, auth: { gameId: host.game_id, token: host.player_token } })
+  const reconnect = connect(base, { autoConnect: false, extraHeaders: { Cookie: adminCookie }, auth: { gameId: host.game_id, token: host.player_token } })
+  try {
+    let ready = event(socket, 'room_ready'); socket.connect(); await ready
+    socket.disconnect()
+    ready = event(reconnect, 'room_ready'); reconnect.connect(); await ready
+    const { rows: [user] } = await db.query<{ email: string }>('SELECT u.email FROM users u JOIN game_players gp ON gp.account_user_id=u.id WHERE gp.id=$1', [member.player_id])
+    await application.auth.login(user.email, 'TestPassword123!')
+    await assert.rejects(application.auth.login(user.email, 'WrongPassword'))
+    const forbiddenAudit = await fetch(`${base}/api/v1/admin/audit?gameId=${host.game_id}`, { headers: { Cookie: tokenCookies.get(member.player_token)! } })
+    assert.equal(forbiddenAudit.status, 403)
+    const logout = await fetch(`${base}/api/v1/auth/logout`, { method: 'POST', headers: { Cookie: tokenCookies.get(member.player_token)!, Origin: 'http://localhost:5173' } })
+    assert.equal(logout.status, 200)
+    const result = await application.operations.audit({ limit: 100, gameId: host.game_id })
+    assert.equal(result.game!.code, host.code)
+    assert.ok(result.entries.every(e => e.resourceId !== other.game_id))
+    const draw = result.entries.find(e => e.action === 'GAME_DRAW')!
+    assert.equal(draw.actorName, 'Audit operator')
+    assert.equal(draw.actorEmail, 'audit.actor@test.local', 'Historical identity survives profile changes')
+    assert.equal(draw.gameCode, host.code)
+    assert.equal(draw.metadata.seq, 1)
+    assert.ok(typeof draw.metadata.question === 'string')
+    for (const action of ['GAME_JOINED','GAME_CONNECTED','GAME_RECONNECTED','GAME_CLAIM_REJECTED','ACCESS_DENIED','LOGIN_SUCCESS','LOGIN_FAILED','LOGOUT']) {
+      assert.ok(result.entries.some(e => e.action === action && e.actorName && e.actorEmail && e.createdAt), action)
+    }
+    const flagged = await application.operations.audit({ limit: 100, gameId: host.game_id, suspicious: true })
+    assert.ok(flagged.entries.every(e => e.suspicious))
+    assert.ok(flagged.entries.some(e => e.action === 'GAME_CLAIM_REJECTED' && e.metadata.warningCount === 3))
+    const searched = await application.operations.audit({ limit: 100, search: 'audit.actor@test.local' })
+    assert.ok(searched.entries.some(e => e.action === 'GAME_DRAW'))
+    const firstPage = await application.operations.audit({ limit: 2, gameId: host.game_id })
+    const secondPage = await application.operations.audit({ limit: 2, gameId: host.game_id, cursor: firstPage.nextCursor! })
+    assert.ok(firstPage.entries.every(e => !secondPage.entries.some(next => next.id === e.id)))
+    assert.ok(!JSON.stringify(result).includes(member.player_token))
+    await api(`/api/v1/admin/audit?gameId=${host.game_id}`, 'GET', undefined, member.player_token, 401)
+  } finally { socket.disconnect(); reconnect.disconnect() }
+})
+
+test('deleting a game requires its owner or super admin and matching code; audit remains accessible', async () => {
+  const owner = await createUser(db, 'delete.owner@test.local', passwordHash, 'Delete owner')
+  const stranger = await createUser(db, 'delete.stranger@test.local', passwordHash, 'Other admin')
+  await createAdminProfile(db, owner.id, 'ADMIN'); await createAdminProfile(db, stranger.id, 'ADMIN')
+  const ownerSession = await application.auth.login(owner.email, 'TestPassword123!')
+  const strangerSession = await application.auth.login(stranger.email, 'TestPassword123!')
+  const host = await application.games.create(owner.name, DEFAULT_TECHNICAL_BANK, owner.id)
+  const member = await join(host.code, 'Deletion member')
+  await application.games.start(host.game_id, host.host_token)
+  const removeAs = (token: string, code: string) => fetch(`${base}/api/games/${host.game_id}`, { method: 'DELETE', headers: { Cookie: `tt_session=${token}`, Origin: 'http://localhost:5173', 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) })
+  assert.equal((await removeAs(strangerSession.token, host.code)).status, 403)
+  assert.equal((await removeAs(ownerSession.token, 'AAAAAA')).status, 400)
+  await api(`/api/games/${host.game_id}`, 'DELETE', { code: host.code }, member.player_token, 403)
+  const socket = connect(base, { autoConnect: false, extraHeaders: { Cookie: adminCookie }, auth: { gameId: host.game_id } })
+  try {
+    const ready = event(socket, 'room_ready'); socket.connect(); await ready
+    const deleted = event(socket, 'game_deleted')
+    assert.equal((await removeAs(ownerSession.token, host.code)).status, 200)
+    await deleted
+    const catalog = await api<{games:Array<{id:string}>}>('/api/games')
+    assert.ok(!catalog.games.some(g => g.id === host.game_id))
+    await api(`/api/games/${host.game_id}`, 'GET', undefined, host.player_token, 404)
+    await assert.rejects(application.games.marks(host.game_id, member.player_token, []), /Game not found/)
+    await assert.rejects(application.games.resumeAccount(host.game_id, owner.id, false), /Game not found/)
+    await assert.rejects(application.games.stateByCode(host.code), /No game/)
+    const audit = await application.operations.audit({ limit: 100, gameId: host.game_id })
+    assert.equal(audit.game!.deleted, true)
+    const deletion = audit.entries.find(e => e.action === 'GAME_DELETED')!
+    assert.equal(deletion.actorName, owner.name)
+    assert.equal(deletion.actorEmail, owner.email)
+    assert.equal(deletion.gameCode, host.code)
+    assert.ok(audit.entries.some(e => e.action === 'GAME_CREATED'))
+  } finally { socket.disconnect() }
+  const rootGame = await application.games.create(owner.name, DEFAULT_TECHNICAL_BANK, owner.id)
+  await api(`/api/games/${rootGame.game_id}`, 'DELETE', { code: rootGame.code })
+  assert.equal((await application.operations.audit({limit:10,gameId:rootGame.game_id})).game!.deleted,true)
 })

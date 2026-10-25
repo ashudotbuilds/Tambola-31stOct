@@ -7,6 +7,9 @@ import type { OperationsService } from './service'
 const auditQuery = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   actorId: z.string().uuid().optional(),
+  search: z.string().trim().max(200).optional(),
+  gameId: z.string().uuid().optional(),
+  suspicious: z.enum(['true', 'false']).transform(value => value === 'true').optional(),
   action: z.string().min(1).max(100).optional(),
   from: z.string().datetime({ offset: true }).optional(),
   to: z.string().datetime({ offset: true }).optional(),

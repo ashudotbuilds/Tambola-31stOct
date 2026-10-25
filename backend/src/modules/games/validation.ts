@@ -15,3 +15,7 @@ export const bankBody = z.object({ bank: z.array(z.object({
   codeSnippet: z.string().max(10_000).optional(),
 })).length(90).refine(items => new Set(items.map(item => item.id)).size === 90, 'Bank must have each ID from 1 to 90 exactly once') })
 export const createBody = z.object({ hostName: name, bank: bankBody.shape.bank.optional() })
+
+export const displayBody = z.object({ seq: z.number().int().min(1).max(90).nullable() })
+
+export const deleteBody = z.object({ code })

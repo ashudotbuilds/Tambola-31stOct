@@ -1,3 +1,4 @@
+import { recordAudit } from './modules/auth/repository'
 import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
 import express, { type ErrorRequestHandler } from 'express'
@@ -57,7 +58,8 @@ export function createApplication(
   app.use('/api/v1', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next() })
   app.get('/health', (_req, res) => res.json({ ok: true }))
   app.get('/ready', async (_req, res) => {
-    await db.query('SELECT id FROM games LIMIT 0')
+    await db.query('SELECT id, deleted_at FROM games LIMIT 0')
+    await db.query('SELECT actor_name, actor_email FROM audit_logs LIMIT 0')
     await db.query('SELECT id FROM users LIMIT 0')
     await db.query('SELECT id FROM events LIMIT 0')
     await db.query('SELECT id FROM participant_profiles LIMIT 0')
@@ -89,7 +91,8 @@ export function createApplication(
       req.auth = await auth.authenticate(token)
       next()
     } catch (error) { next(error) }
-  }, gameRoutes(games, claims, id => {
+  }, gameRoutes(games, claims, (id, deleted) => {
+    if (deleted) io.to(roomName(id)).emit('game_deleted')
     io.to(roomName(id)).emit('game_changed')
     io.to(adminRoomName).emit('dashboard_changed')
   }))
@@ -104,7 +107,13 @@ export function createApplication(
   app.use('/api/v1/admin', participantRoutes(participants, auth))
   app.use('/api/v1/admin', adminOperationsRoutes(operations, auth, () => io.engine.clientsCount))
   app.use((_req, res) => { res.status(404).json({ ok: false, error: 'Route not found' }) })
-  const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+  const errorHandler: ErrorRequestHandler = async (error, req, res, _next) => {
+    if (error instanceof AppError && [401, 403].includes(error.status) && req.auth) {
+      const gameId = /^\/api\/games\/([a-f0-9-]{36})(?:\/|$)/i.exec(req.originalUrl)?.[1]
+      try { await recordAudit(db, { actorId: req.auth.user.id, action: 'ACCESS_DENIED', resourceType: gameId ? 'game' : 'system',
+        resourceId: gameId, metadata: { reason: error.message, method: req.method }, ipAddress: req.ip, userAgent: req.header('user-agent') }) }
+      catch { console.error('Could not record access denial audit') }
+    }
     const requestId = String(res.locals.requestId ?? '')
     const send = (status: number, code: string, message: string) => res.status(status).json({
       ok: false,

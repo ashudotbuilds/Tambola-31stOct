@@ -7,15 +7,17 @@ const config = readConfig()
 const db = postgresDatabase(config.DATABASE_URL, config.DATABASE_POOL_MAX)
 let demoAccounts: Awaited<ReturnType<typeof configureTestingAccounts>>
 try {
+  await db.query('SELECT actor_name, actor_email FROM audit_logs LIMIT 0')
+  await db.query('SELECT deleted_at FROM games LIMIT 0')
   demoAccounts = await configureTestingAccounts(db, config.TEST_ACCOUNTS_ENABLED)
 } catch (error) {
   const code = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' && /^[A-Z0-9]{5}$/.test(error.code) ? error.code : 'unknown'
   const guidance = ['42703', '42P01'].includes(code)
-    ? 'Database schema is out of date. Run npm run db:migrate:prod before starting the server.'
+    ? 'Database schema is out of date. Run npm run db:migrate before starting development (production: npm run db:migrate:prod).'
     : code === '23505'
       ? 'A reserved testing account ID conflicts with an existing account.'
       : 'Check database connectivity, migrations, and reserved testing account IDs.'
-  console.error(`Testing account setup failed (${code}). ${guidance}`)
+  console.error(`API startup checks failed (${code}). ${guidance}`)
   await db.close()
   process.exit(1)
 }

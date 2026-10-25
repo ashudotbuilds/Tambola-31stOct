@@ -135,7 +135,7 @@ export function authRoutes(auth: AuthService) {
     try {
       const token = extractSessionToken(req)
       if (token) {
-        await auth.logout(token, req.auth?.user.id)
+        await auth.logout(token, req.auth?.user.id, { ip: req.ip, userAgent: req.header('user-agent') })
       }
       res.clearCookie('tt_session', sessionCookie(req))
       res.json({ ok: true })

@@ -11,7 +11,7 @@ export function gameCode() {
 }
 
 export async function findGame(db: SqlClient, id: string, lock = false): Promise<GameRecord> {
-  const { rows } = await db.query<GameRecord>(`SELECT * FROM games WHERE id = $1${lock ? ' FOR UPDATE' : ''}`, [id])
+  const { rows } = await db.query<GameRecord>(`SELECT * FROM games WHERE id = $1 AND deleted_at IS NULL${lock ? ' FOR UPDATE' : ''}`, [id])
   ensure(rows[0], 404, 'Game not found')
   return rows[0]
 }

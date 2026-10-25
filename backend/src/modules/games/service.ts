@@ -16,9 +16,9 @@ export class GameService {
     const hostToken = newToken()
     const playerToken = newToken()
     const settings: Settings = {
-      points: DEFAULT_POINTS, wrong_claim_penalty: 10, close_after_calls: 10,
+      points: DEFAULT_POINTS, wrong_claim_penalty: 0, close_after_calls: 10,
       max_players: 100, reveal_seconds: 3, pause_after_calls: 4,
-      revealed_seqs: [], custom_bank: bank,
+      revealed_seqs: [], question_batch_start: 1, custom_bank: bank,
     }
     return this.db.transaction(async db => {
       // ON CONFLICT avoids aborting the transaction in the rare code collision.
@@ -43,6 +43,17 @@ export class GameService {
     })
   }
 
+  async remove(gameId: string, accountId: string, superAdmin: boolean, code: string) {
+    return this.db.transaction(async db => {
+      const game = await findGame(db, gameId, true)
+      ensure(superAdmin || game.account_user_id === accountId, 403, 'Only the game administrator can delete this game')
+      ensure(code === game.code, 400, 'Enter the game code to confirm deletion')
+      await db.query("UPDATE games SET deleted_at = now(), status = 'finished', finished_at = coalesce(finished_at, now()) WHERE id = $1", [gameId])
+      await recordAudit(db, { actorId: accountId, action: 'GAME_DELETED', resourceType: 'game', resourceId: gameId, metadata: { gameCode: game.code, status: game.status } })
+      return { ok: true }
+    })
+  }
+
   async resumeAccount(gameId: string, accountId: string, superAdmin: boolean) {
     return this.db.transaction(async db => {
       const game = await findGame(db,gameId,true)
@@ -58,8 +69,9 @@ export class GameService {
 
   async join(code: string, name: string, accountId?: string) {
     return this.db.transaction(async db => {
-      const { rows: [game] } = await db.query<GameRecord>('SELECT * FROM games WHERE code = $1 FOR UPDATE', [code])
+      const { rows: [game] } = await db.query<GameRecord>('SELECT * FROM games WHERE code = $1 ORDER BY created_at DESC LIMIT 1 FOR UPDATE', [code])
       ensure(game, 404, 'No game found with that code')
+      ensure(!game.deleted_at && game.status !== 'finished', 410, 'This game has been ended by the host')
       if (accountId) {
         const { rows: [existing] } = await db.query<PlayerRecord>('SELECT * FROM game_players WHERE game_id=$1 AND account_user_id=$2 AND NOT is_host', [game.id, accountId])
         if (existing) {
@@ -89,7 +101,7 @@ export class GameService {
   }
 
   async stateByCode(code: string) {
-    const { rows: [game] } = await this.db.query<{ id: string }>('SELECT id FROM games WHERE code = $1', [code])
+    const { rows: [game] } = await this.db.query<{ id: string }>('SELECT id FROM games WHERE code = $1 AND deleted_at IS NULL', [code])
     ensure(game, 404, 'No game found with that code')
     return this.state(game.id)
   }
@@ -119,7 +131,7 @@ export class GameService {
     })
   }
 
-  async start(gameId: string, token: string) {
+  async start(gameId: string, token: string, actorId?: string) {
     return this.db.transaction(async db => {
       const game = await findGame(db, gameId, true)
       requireHost(game, token)
@@ -127,12 +139,12 @@ export class GameService {
       const { rows } = await db.query('SELECT id FROM game_players WHERE game_id = $1 AND NOT is_host LIMIT 1', [gameId])
       ensure(rows.length, 409, 'At least one player must join first')
       await db.query("UPDATE games SET status = 'playing', started_at = now() WHERE id = $1", [gameId])
-      await recordAudit(db,{actorId:game.account_user_id,action:'GAME_STARTED',resourceType:'game',resourceId:gameId})
+      await recordAudit(db,{actorId:actorId ?? game.account_user_id,action:'GAME_STARTED',resourceType:'game',resourceId:gameId})
       return { ok: true, status: 'playing' }
     })
   }
 
-  async status(gameId: string, token: string, next: 'paused' | 'playing' | 'finished') {
+  async status(gameId: string, token: string, next: 'paused' | 'playing' | 'finished', actorId?: string) {
     return this.db.transaction(async db => {
       const game = await findGame(db, gameId, true)
       requireHost(game, token)
@@ -149,18 +161,18 @@ export class GameService {
         ensure(!['lobby', 'finished'].includes(game.status), 409, 'Game is not in progress')
       }
       await db.query("UPDATE games SET status = $2, paused_from_status = $3, finished_at = CASE WHEN $2 = 'finished' THEN now() ELSE finished_at END WHERE id = $1", [gameId, status, pausedFrom])
-      await recordAudit(db,{actorId:game.account_user_id,action:'GAME_STATUS_CHANGED',resourceType:'game',resourceId:gameId,metadata:{status}})
+      await recordAudit(db,{actorId:actorId ?? game.account_user_id,action:'GAME_STATUS_CHANGED',resourceType:'game',resourceId:gameId,metadata:{status}})
       return { ok: true, status }
     })
   }
 
-  async draw(gameId: string, token: string) {
+  async draw(gameId: string, token: string, actorId?: string) {
     return this.db.transaction(async db => {
       const game = await findGame(db, gameId, true)
       requireHost(game, token)
       ensure(['playing', 'closing'].includes(game.status), 409,
         game.status === 'lobby' ? 'Start the game first' : game.status === 'paused' ? 'Game is paused' : 'Game is over')
-      const { rows } = await db.query<{ number: number }>('SELECT number FROM game_calls WHERE game_id = $1', [gameId])
+      const { rows } = await db.query<{ number: number; seq: number }>('SELECT number, seq FROM game_calls WHERE game_id = $1', [gameId])
       const called = new Set(rows.map(row => row.number))
       const remaining = Array.from({ length: 90 }, (_, i) => i + 1).filter(n => !called.has(n))
       ensure(remaining.length, 409, 'All 90 numbers have been called')
@@ -168,17 +180,36 @@ export class GameService {
       const bank = game.settings.custom_bank as TechnicalItem[] ?? DEFAULT_TECHNICAL_BANK
       const clue = bank.find(item => item.id === number)?.clue ?? DEFAULT_TECHNICAL_BANK[number - 1].clue
       const seq = game.next_seq
+      const revealed = new Set(game.settings.revealed_seqs ?? [])
+      // Keep revealed answers visible until the next draw starts a new batch.
+      if (rows.every(row => revealed.has(row.seq))) {
+        await db.query("UPDATE games SET settings = jsonb_set(settings, '{question_batch_start}', to_jsonb($2::int)) WHERE id = $1", [gameId, seq])
+      }
       await db.query('INSERT INTO game_calls (game_id, seq, number, clue) VALUES ($1,$2,$3,$4)', [gameId, seq, number, clue])
       const closing = game.settings.closing_seq
       const finished = game.status === 'closing' && closing !== undefined && seq - closing >= (game.settings.close_after_calls ?? 10)
       const status = finished ? 'finished' : game.status
-      await db.query("UPDATE games SET next_seq = next_seq + 1, status = $2, finished_at = CASE WHEN $2 = 'finished' THEN now() ELSE finished_at END WHERE id = $1", [gameId, status])
-      await recordAudit(db,{actorId:game.account_user_id,action:'GAME_DRAW',resourceType:'game',resourceId:gameId,metadata:{seq}})
+      await db.query("UPDATE games SET next_seq = next_seq + 1, settings = jsonb_set(settings, '{display_seq}', 'null'::jsonb), status = $2, finished_at = CASE WHEN $2 = 'finished' THEN now() ELSE finished_at END WHERE id = $1", [gameId, status])
+      await recordAudit(db,{actorId:actorId ?? game.account_user_id,action:'GAME_DRAW',resourceType:'game',resourceId:gameId,metadata:{seq, number, question: clue}})
       return { ok: true as const, seq, number, clue, status, called_count: called.size + 1 }
     })
   }
 
-  async reveal(gameId: string, token: string, seqs: number[]) {
+  async display(gameId: string, token: string, seq: number | null, actorId?: string) {
+    return this.db.transaction(async db => {
+      const game = await findGame(db, gameId, true)
+      requireHost(game, token)
+      if (seq !== null) {
+        const { rows } = await db.query('SELECT seq FROM game_calls WHERE game_id = $1 AND seq = $2', [gameId, seq])
+        ensure(rows.length, 400, 'Only an already-called question can be shown')
+      }
+      await db.query("UPDATE games SET settings = jsonb_set(settings, '{display_seq}', $2::jsonb) WHERE id = $1", [gameId, JSON.stringify(seq)])
+      await recordAudit(db, { actorId: actorId ?? game.account_user_id, action: 'GAME_QUESTION_DISPLAYED', resourceType: 'game', resourceId: gameId, metadata: { seq } })
+      return { ok: true, display_seq: seq }
+    })
+  }
+
+  async reveal(gameId: string, token: string, seqs: number[], actorId?: string) {
     return this.db.transaction(async db => {
       const game = await findGame(db, gameId, true)
       requireHost(game, token)
@@ -187,17 +218,17 @@ export class GameService {
       // merge under the game lock so one request cannot hide another's answers.
       const revealed = [...new Set([...(game.settings.revealed_seqs ?? []), ...seqs])].sort((a, b) => a - b)
       await db.query("UPDATE games SET settings = jsonb_set(settings, '{revealed_seqs}', $2::jsonb) WHERE id = $1", [gameId, JSON.stringify(revealed)])
-      await recordAudit(db, { actorId: game.account_user_id, action: 'GAME_ANSWERS_REVEALED', resourceType: 'game', resourceId: gameId, metadata: { total: revealed.length } })
+      await recordAudit(db, { actorId: actorId ?? game.account_user_id, action: 'GAME_ANSWERS_REVEALED', resourceType: 'game', resourceId: gameId, metadata: { total: revealed.length } })
       return { ok: true, revealed_seqs: revealed }
     })
   }
 
-  async bank(gameId: string, token: string, bank: TechnicalItem[]) {
+  async bank(gameId: string, token: string, bank: TechnicalItem[], actorId?: string) {
     return this.db.transaction(async db => {
       const game = await findGame(db, gameId, true)
       requireHost(game, token)
       await db.query("UPDATE games SET settings = jsonb_set(settings, '{custom_bank}', $2::jsonb) WHERE id = $1", [gameId, JSON.stringify(bank)])
-      await recordAudit(db, { actorId: game.account_user_id, action: 'GAME_BANK_UPDATED', resourceType: 'game', resourceId: gameId, metadata: { total: bank.length } })
+      await recordAudit(db, { actorId: actorId ?? game.account_user_id, action: 'GAME_BANK_UPDATED', resourceType: 'game', resourceId: gameId, metadata: { total: bank.length } })
       return { ok: true }
     })
   }
