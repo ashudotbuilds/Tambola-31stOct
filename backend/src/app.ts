@@ -91,9 +91,9 @@ export function createApplication(
       req.auth = await auth.authenticate(token)
       next()
     } catch (error) { next(error) }
-  }, gameRoutes(games, claims, (id, deleted) => {
+  }, gameRoutes(games, claims, (id, deleted, full) => {
     if (deleted) io.to(roomName(id)).emit('game_deleted')
-    io.to(roomName(id)).emit('game_changed')
+    io.to(roomName(id)).emit('game_changed', { full: Boolean(full) })
     io.to(adminRoomName).emit('dashboard_changed')
   }))
   app.use('/api/v1/auth', authRoutes(auth))

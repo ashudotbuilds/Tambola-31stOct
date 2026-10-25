@@ -85,6 +85,12 @@ export interface RpcFailure {
   error: string
 }
 
+/** Incremental calls and current mutable state; static ticket/bank stay on the client. */
+export type GameUpdate = Omit<GameState, 'me' | 'settings'> & {
+  settings: Omit<Settings, 'custom_bank'>
+  me: Omit<Me, 'ticket'> | null
+}
+
 export type Rpc<T> = T | RpcFailure
 
 export function isFailure(value: unknown): value is RpcFailure {

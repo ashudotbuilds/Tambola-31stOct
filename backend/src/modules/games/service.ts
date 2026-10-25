@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto'
 import { DEFAULT_TECHNICAL_BANK, type TechnicalItem } from '../../shared/bank'
 import { DEFAULT_POINTS, ticketNumbers } from '../../shared/claims'
-import type { ClaimType, GameState, GameStatus, Settings } from '../../shared/types'
+import type { ClaimType, GameState, GameStatus, GameUpdate, Settings } from '../../shared/types'
 import type { Database } from '../../db/database'
 import { ensure } from '../../errors'
 import { findGame, findPlayer, findTicket, gameCode, newToken, requireHost, tokenHash } from './repository'
@@ -107,14 +107,27 @@ export class GameService {
   }
 
   async state(gameId: string, token?: string): Promise<GameState> {
+    return this.readState(gameId, token)
+  }
+
+  async updates(gameId: string, after: number, token?: string): Promise<GameUpdate> {
+    const state = await this.readState(gameId, token, after)
+    const { custom_bank: _bank, ...settings } = state.settings
+    const me = state.me ? (({ ticket: _ticket, ...mutable }) => mutable)(state.me) : null
+    return { ...state, settings, me }
+  }
+
+  private async readState(gameId: string, token?: string, after?: number): Promise<GameState> {
     return this.db.transaction(async db => {
       // A coherent snapshot of game, calls, claims, and private ticket.
       await db.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY')
-      const game = await findGame(db, gameId)
+      const { rows: [game] } = await db.query<GameRecord>(
+        `SELECT id, code, status, created_at, ${after === undefined ? 'settings' : "settings - 'custom_bank' AS settings"} FROM games WHERE id=$1 AND deleted_at IS NULL`, [gameId])
+      ensure(game, 404, 'Game not found')
       const { rows: players } = await db.query<GameState['players'][number]>(
         'SELECT id, display_name AS name, is_host, score, wrong_claims FROM game_players WHERE game_id = $1 ORDER BY score DESC, created_at, id', [gameId],
       )
-      const { rows: calls } = await db.query<GameState['calls'][number]>('SELECT seq, number, clue, called_at FROM game_calls WHERE game_id = $1 ORDER BY seq', [gameId])
+      const { rows: calls } = await db.query<GameState['calls'][number]>('SELECT seq, number, clue, called_at FROM game_calls WHERE game_id = $1 AND seq > $2 ORDER BY seq', [gameId, after ?? 0])
       const { rows: claims } = await db.query<GameState['claims'][number]>(
         `SELECT c.id, c.player_id, p.display_name AS name, c.claim_type, c.status, c.points, c.reason, c.created_at
          FROM claims c JOIN game_players p ON p.id = c.player_id WHERE c.game_id = $1 ORDER BY c.created_at, c.id`, [gameId],
@@ -122,7 +135,7 @@ export class GameService {
       let me: GameState['me'] = null
       if (token) {
         const player = await findPlayer(db, gameId, token)
-        const { rows: [ticket] } = await db.query<{ cells: number[][]; marked: number[]; cut: number[] }>('SELECT cells, marked, cut FROM tickets WHERE player_id = $1', [player.id])
+        const { rows: [ticket] } = await db.query<{ cells: number[][]; marked: number[]; cut: number[] }>(`SELECT ${after === undefined ? 'cells,' : ''} marked, cut FROM tickets WHERE player_id = $1`, [player.id])
         me = { player_id: player.id, name: player.display_name, is_host: player.is_host,
           score: player.score, wrong_claims: player.wrong_claims, ticket: ticket?.cells ?? [], marked: ticket?.marked ?? [], cut: ticket?.cut ?? [] }
       }

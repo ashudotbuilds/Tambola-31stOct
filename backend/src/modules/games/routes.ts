@@ -5,6 +5,7 @@ import type { ClaimService } from './claims'
 import { ensure } from '../../errors'
 import * as validate from './validation'
 import { requireRole } from '../auth/middleware'
+import { findPlayer } from './repository'
 
 function bearer(req: Request, required = true): string | undefined {
   const authorization = req.header('authorization')
@@ -17,7 +18,7 @@ function bearer(req: Request, required = true): string | undefined {
   return match[1]
 }
 
-export function gameRoutes(games: GameService, claims: ClaimService, changed: (gameId: string, deleted?: boolean) => void) {
+export function gameRoutes(games: GameService, claims: ClaimService, changed: (gameId: string, deleted?: boolean, full?: boolean) => void) {
   const router = Router()
   const entryLimit = rateLimit({ windowMs: 60_000, limit: 150, standardHeaders: 'draft-7', legacyHeaders: false,
     message: { ok: false, error: 'Too many requests. Please wait a minute.' } })
@@ -71,9 +72,8 @@ export function gameRoutes(games: GameService, claims: ClaimService, changed: (g
         }
       }
       if (token && actor.principal.type === 'PARTICIPANT') {
-        const state = await games.state(id, token)
-        const { rows } = await games.db.query('SELECT id FROM game_players WHERE id=$1 AND account_user_id=$2', [state.me?.player_id, actor.user.id])
-        ensure(rows.length, 403, 'Game session belongs to another account')
+        const player = await findPlayer(games.db, id, token)
+        ensure(player.account_user_id === actor.user.id, 403, 'Game session belongs to another account')
       }
       next()
     } catch (error) { next(error) }
@@ -84,7 +84,14 @@ export function gameRoutes(games: GameService, claims: ClaimService, changed: (g
     changed(String(req.params.id), true); res.json(result)
   })
   router.get('/:id', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
     res.json(await games.state(String(req.params.id), bearer(req, false)))
+  })
+  router.get('/:id/updates', async (req, res) => {
+    const after = Number(req.query.after ?? 0)
+    ensure(Number.isInteger(after) && after >= 0 && after <= 90, 400, 'Invalid call cursor')
+    res.setHeader('Cache-Control', 'no-store')
+    res.json(await games.updates(String(req.params.id), after, bearer(req, false)))
   })
   router.post('/:id/start', async (req, res) => {
     const result = await games.start(String(req.params.id), bearer(req)!, req.auth!.user.id)
@@ -112,7 +119,7 @@ export function gameRoutes(games: GameService, claims: ClaimService, changed: (g
   router.put('/:id/bank', async (req, res) => {
     const { bank } = validate.bankBody.parse(req.body)
     const result = await games.bank(String(req.params.id), bearer(req)!, bank, req.auth!.user.id)
-    changed(String(req.params.id)); res.json(result)
+    changed(String(req.params.id), false, true); res.json(result)
   })
   router.put('/:id/marks', async (req, res) => {
     const { marked } = validate.marksBody.parse(req.body)

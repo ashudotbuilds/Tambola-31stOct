@@ -9,6 +9,7 @@ import type {
   CreateGameResult,
   DrawResult,
   GameState,
+  GameUpdate,
   JoinGameResult,
   LoginResult,
 } from './types'
@@ -151,6 +152,7 @@ export async function joinGame(code: string, name: string): Promise<JoinGameResu
   return result
 }
 export const getGameState = (gameId: string, token?: string | null) => request<GameState>(`/games/${gameId}`, { token })
+export const getGameUpdates = (gameId: string, after: number, token?: string | null) => request<GameUpdate>(`/games/${gameId}/updates?after=${after}`, { token })
 export const getGameStateByCode = (code: string) => request<GameState>(`/games/code/${encodeURIComponent(code.trim().toUpperCase())}`)
 export const startGame = (gameId: string, token: string) => request<{ status: string }>(`/games/${gameId}/start`, { method: 'POST', token })
 export const drawNumber = (gameId: string, token: string) => request<DrawResult>(`/games/${gameId}/calls`, { method: 'POST', token })
