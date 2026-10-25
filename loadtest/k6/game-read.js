@@ -41,6 +41,12 @@ function sessionFrom(response, label) {
   return session
 }
 
+function clearCookies() {
+  // k6 reuses a per-VU cookie jar by default. Each account must stay isolated,
+  // and auth/login requests after the first one must not carry another session.
+  http.cookieJar().clear(baseUrl)
+}
+
 function jsonParams(session, tag) {
   return {
     headers: { Cookie: `tt_session=${session}`, 'Content-Type': 'application/json', Origin: frontendOrigin },
@@ -50,6 +56,7 @@ function jsonParams(session, tag) {
 
 function deleteTemporaryGame(host, gameId, code) {
   if (!gameId) return
+  clearCookies()
   http.del(`${baseUrl}/api/games/${gameId}`, JSON.stringify({ code }), {
     ...jsonParams(host.session, 'delete_temporary_game'),
   })
@@ -62,6 +69,7 @@ export function setup() {
     throw new Error('Set ADMIN_LOGIN, ADMIN_PASSWORD, and LOAD_TEST_PASSWORD in your shell environment.')
   }
 
+  clearCookies()
   const loginAdmin = http.post(`${baseUrl}/api/v1/auth/login`,
     JSON.stringify({ email: adminLogin, password: adminPassword }),
     { headers: { 'Content-Type': 'application/json' }, tags: { name: 'login_host_setup' } })
@@ -72,6 +80,7 @@ export function setup() {
   const participants = []
   for (let index = 1; index < maxVus; index++) {
     sleep(4.2)
+    clearCookies()
     const loginId = `tt-load-user${String(index).padStart(4, '0')}`
     const response = http.post(`${baseUrl}/api/v1/auth/login`,
       JSON.stringify({ email: loginId, password: loadTestPassword }),
@@ -80,16 +89,19 @@ export function setup() {
     participants.push({ session: sessionFrom(response, 'Participant login'), loginId })
   }
 
+  clearCookies()
   const created = http.post(`${baseUrl}/api/games`, JSON.stringify({ hostName: 'k6 Load Test' }),
     jsonParams(host.session, 'create_temporary_game'))
   requireOk(created, 'temporary game creation', 201)
   const game = created.json()
-  if (!game?.game_id || !game?.code || !game?.player_token) throw new Error('Game creation response omitted required setup data.')
+  if (!game?.game_id || !game?.code || !game?.player_token || !game?.host_token) throw new Error('Game creation response omitted required setup data.')
   host.playerToken = game.player_token
+  host.hostToken = game.host_token
 
   try {
     participants.forEach((participant, index) => {
       const name = `Load ${String(index + 1).padStart(4, '0')}`
+      clearCookies()
       const joined = http.post(`${baseUrl}/api/games/join`, JSON.stringify({ code: game.code, name }),
         jsonParams(participant.session, 'join_temporary_game'))
       requireOk(joined, 'participant game join', 201)
@@ -98,8 +110,9 @@ export function setup() {
       participant.playerToken = result.player_token
     })
 
+    clearCookies()
     const startParams = jsonParams(host.session, 'start_temporary_game')
-    startParams.headers.Authorization = `Bearer ${host.playerToken}`
+    startParams.headers.Authorization = `Bearer ${host.hostToken}`
     const started = http.post(`${baseUrl}/api/games/${game.game_id}/start`, JSON.stringify({}), startParams)
     requireOk(started, 'temporary game start', 200)
   } catch (error) {
@@ -132,6 +145,7 @@ export default function (data) {
 }
 
 export function teardown(data) {
+  clearCookies()
   const response = http.del(
     `${baseUrl}/api/games/${data.gameId}`,
     JSON.stringify({ code: data.code }),
