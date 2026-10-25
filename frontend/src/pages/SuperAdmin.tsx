@@ -31,7 +31,7 @@ export default function SuperAdmin() {
       ['Participants', dashboard.counts.participants], ['Active games', dashboard.counts.activeGames], ['Accepted claims', dashboard.counts.acceptedClaims], ['Connections', dashboard.socketConnections],
     ].map(([label, value]) => <div className="rounded border border-edge p-3" key={String(label)}><dt className="text-xs text-slate-400">{label}</dt><dd className="mt-2 text-2xl">{value}</dd></div>)}</dl></section>}
     <div className="grid gap-4 sm:grid-cols-3">{[
-      ['/super-admin/admins', 'Create admin', 'Create and manage administrator accounts.'], ['/admin/audit', 'Audit trail', 'Filter and inspect recorded actions.'], ['/admin', 'Games', 'Create and manage games.'], ['/admin/participants', 'Participants', 'Import players and manage credentials.'],
+      ['/super-admin/admins', 'Create admin', 'Create and manage administrator accounts.'], ['/super-admin/load-test', 'Load test setup', 'Create dedicated accounts for the k6 load test.'], ['/admin/audit', 'Audit trail', 'Filter and inspect recorded actions.'], ['/admin', 'Games', 'Create and manage games.'], ['/admin/participants', 'Participants', 'Import players and manage credentials.'],
     ].map(([path, title, description]) => <Link to={path} className="card block p-5 transition-colors hover:border-cyan" key={path}><h2 className="text-xl font-bold text-cyan">{title} →</h2><p className="mt-3 text-sm text-slate-400">{description}</p></Link>)}</div>
   </AdminPage>
 }

@@ -88,6 +88,7 @@ export default function Landing() {
       </header>
 
       <div className="text-center"><Link to="/login" className="text-sm font-semibold text-cyan hover:underline">Administrator or participant sign in</Link></div>
+      <div className="text-center"><Link to="/super-admin/load-test" className="text-xs text-slate-500 hover:text-cyan">Load-test account setup · Super Admin</Link></div>
 
       {!configured ? (
         <div className="card border-rose/60 bg-rose/10 p-4 text-sm text-rose">

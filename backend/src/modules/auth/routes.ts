@@ -1,5 +1,7 @@
 import { Router, type Request, type CookieOptions } from 'express'
 import rateLimit from 'express-rate-limit'
+import type { Database } from '../../db/database'
+import { disableLoadTestAccounts, provisionLoadTestAccounts } from './loadTestAccounts'
 import type { AuthService } from './service'
 import { extractSessionToken, requireAuth, requireRole } from './middleware'
 import * as validate from './validation'
@@ -158,7 +160,7 @@ export function authRoutes(auth: AuthService) {
   return router
 }
 
-export function superAdminRoutes(auth: AuthService) {
+export function superAdminRoutes(auth: AuthService, options?: { db: Database; loadTestingEnabled: boolean }) {
   const router = Router()
   const credentialLimiter = rateLimit({
     windowMs: 60_000,
@@ -169,6 +171,18 @@ export function superAdminRoutes(auth: AuthService) {
 
   router.use(requireAuth(auth))
   router.use(requireRole(['SUPER_ADMIN']))
+
+  if (options?.loadTestingEnabled) {
+    const loadTestLimiter = rateLimit({ windowMs: 60 * 60_000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false })
+    router.post('/load-test/accounts', loadTestLimiter, async (req, res, next) => {
+      try { res.status(201).json({ ok: true, ...(await provisionLoadTestAccounts(options.db, req.auth!.user.id)) }) }
+      catch (err) { next(err) }
+    })
+    router.delete('/load-test/accounts', loadTestLimiter, async (req, res, next) => {
+      try { res.json({ ok: true, ...(await disableLoadTestAccounts(options.db, req.auth!.user.id)) }) }
+      catch (err) { next(err) }
+    })
+  }
 
   router.get('/admins', async (req, res, next) => {
     try {

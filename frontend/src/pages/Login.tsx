@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { loginUser } from '@/lib/api'
 import { request } from '@/lib/http'
 import { ArrowRight, Eye, EyeOff, LoaderCircle } from 'lucide-react'
@@ -8,6 +8,7 @@ import { TicketPreview, PlaySteps } from '@/components/GameChrome'
 type DemoAccount = { id: string; name: string; email: string; role: string }
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [showPassword, setShowPassword] = useState(false)
   const [identifier, setIdentifier] = useState(''),
     [password, setPassword] = useState(''),
@@ -33,6 +34,11 @@ export default function Login() {
     try {
       const result = await loginUser(id, secret)
       localStorage.setItem('tt.account.id', result.user.id)
+      const returnTo = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
+      if (result.principal.type === 'SUPER_ADMIN' && returnTo === '/super-admin/load-test') {
+        navigate(returnTo, { replace: true })
+        return
+      }
       navigate(
         result.principal.type === 'PARTICIPANT'
           ? '/account' + window.location.search
@@ -126,7 +132,7 @@ export default function Login() {
           </div>
         </section>
       )}
-      <footer className="login-footer"><span>Technical Tambola</span><span>Play together. Think for yourself.</span></footer>
+      <footer className="login-footer"><span>Technical Tambola</span><span className="flex flex-wrap items-center gap-3"><Link to="/super-admin/load-test" className="hover:text-cyan">Load-test setup · Super Admin</Link><span>Play together. Think for yourself.</span></span></footer>
     </main>
   )
 }

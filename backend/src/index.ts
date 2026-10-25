@@ -29,6 +29,7 @@ const { server, io } = createApplication(db, {
   trustProxyHops: config.TRUST_PROXY_HOPS,
   bootstrapSecret: config.SUPER_ADMIN_BOOTSTRAP_SECRET,
   demoAccounts,
+  testingAccountsEnabled: config.TEST_ACCOUNTS_ENABLED,
   email: { url: config.EMAIL_API_URL, apiKey: config.EMAIL_API_KEY, from: config.EMAIL_FROM },
 })
 

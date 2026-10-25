@@ -30,7 +30,7 @@ export default function AccountGuard({
         Checking your account…
       </main>
     )
-  if (state === 'anonymous') return <Navigate to="/login" replace />
+  if (state === 'anonymous') return <Navigate to="/login" replace state={{ from: location }} />
   if (role === 'admin' && state === 'PARTICIPANT')
     return <Navigate to="/account" replace />
   if (role === 'super-admin' && state !== 'SUPER_ADMIN')

@@ -24,6 +24,7 @@ export function AdminNavigation({ superAdmin }: { superAdmin: boolean }) {
     <NavLink to="/admin" end>Games</NavLink>
     <NavLink to="/admin/participants">Participants</NavLink>
     {superAdmin && <NavLink to="/super-admin/admins">Create admin</NavLink>}
+    {superAdmin && <NavLink to="/super-admin/load-test">Load test</NavLink>}
     <NavLink to="/admin/audit">Audit trail</NavLink>
   </nav>
 }

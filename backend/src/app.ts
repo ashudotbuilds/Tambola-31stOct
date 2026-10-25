@@ -25,7 +25,7 @@ import type { ServerTelemetry } from './telemetry'
 
 export function createApplication(
   db: Database,
-  options: { origins: string[]; trustProxyHops?: number; bootstrapSecret?: string; email?: EmailOptions; telemetry?: ServerTelemetry; demoAccounts?: Array<{ id: string; name: string; email: string; role: string }> },
+  options: { origins: string[]; trustProxyHops?: number; bootstrapSecret?: string; email?: EmailOptions; telemetry?: ServerTelemetry; demoAccounts?: Array<{ id: string; name: string; email: string; role: string }>; testingAccountsEnabled?: boolean },
 ) {
   const app = express()
   app.disable('x-powered-by')
@@ -121,7 +121,7 @@ export function createApplication(
     if (!options.demoAccounts) { res.status(404).json({ok:false}); return }
     res.json({ok:true,accounts:options.demoAccounts})
   })
-  app.use('/api/v1/super-admin', superAdminRoutes(auth))
+  app.use('/api/v1/super-admin', superAdminRoutes(auth, { db, loadTestingEnabled: options.testingAccountsEnabled === true }))
   app.use('/api/v1/super-admin', superAdminOperationsRoutes(operations, auth))
   app.use('/api/v1/admin', participantRoutes(participants, auth))
   app.use('/api/v1/admin', adminOperationsRoutes(operations, auth, () => io.engine.clientsCount))

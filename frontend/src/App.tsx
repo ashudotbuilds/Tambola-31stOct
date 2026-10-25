@@ -11,6 +11,7 @@ const AdminAccounts = lazy(() => import('./pages/AdminAccounts'))
 const Participants = lazy(() => import('./pages/Participants'))
 const Audit = lazy(() => import('./pages/Audit'))
 const ParticipantHome = lazy(() => import('./pages/ParticipantHome'))
+const LoadTestSetup = lazy(() => import('./pages/LoadTestSetup'))
 
 export function App() {
   return (
@@ -20,6 +21,7 @@ export function App() {
       <Route path="/admin" element={<AccountGuard role="admin"><Admin /></AccountGuard>} />
       <Route path="/super-admin" element={<AccountGuard role="super-admin"><SuperAdmin /></AccountGuard>} />
       <Route path="/super-admin/admins" element={<AccountGuard role="super-admin"><AdminAccounts /></AccountGuard>} />
+      <Route path="/super-admin/load-test" element={<AccountGuard role="super-admin"><LoadTestSetup /></AccountGuard>} />
       <Route path="/admin/participants" element={<AccountGuard role="admin"><Participants /></AccountGuard>} />
       <Route path="/admin/events" element={<Navigate to="/admin/participants" replace />} />
       <Route path="/admin/rounds" element={<Navigate to="/admin" replace />} />
