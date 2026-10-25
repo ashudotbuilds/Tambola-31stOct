@@ -5,8 +5,8 @@ const require = createRequire(import.meta.url)
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser = await chromium.launch()
 try {
-  // Match a regular browser: PostHog filters known automation user agents.
-  const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36' })
+  // Start Vite with VITE_POSTHOG_VERIFY_AUTOMATION=true for this local-only check.
+  const page = await browser.newPage()
   const errors = []
   const network = []
   const sdkMessages = []
@@ -14,15 +14,11 @@ try {
   page.on('requestfailed', request => { if (request.url().includes('posthog.com')) network.push({ host: new URL(request.url()).hostname, failure: request.failure()?.errorText }) })
   page.on('response', response => { if (response.url().includes('posthog.com')) network.push({ host: new URL(response.url()).hostname, method: response.request().method(), status: response.status() }) })
   page.on('pageerror', error => errors.push(error.message))
-  await page.goto(process.env.AUDIT_WEB_URL || 'http://localhost:5175')
   const capture = page.waitForResponse(response => {
     const url = new URL(response.url())
     return ['us.i.posthog.com', 'eu.i.posthog.com'].includes(url.hostname) && response.request().method() === 'POST' && response.ok()
   }, { timeout: 20_000 })
-  await page.evaluate(async () => {
-    const { trackTelemetry } = await import('/src/lib/telemetry.ts')
-    trackTelemetry('posthog_setup_verified', { source: 'installation-check' })
-  })
+  await page.goto(process.env.AUDIT_WEB_URL || 'http://localhost:5175')
   let accepted
   try { accepted = await capture }
   catch (error) {

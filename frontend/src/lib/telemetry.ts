@@ -14,7 +14,10 @@ function getClient(): Promise<PostHog | null> {
     posthog.init(key!, {
       api_host: host, autocapture: false, capture_pageview: false, capture_pageleave: false,
       capture_exceptions: false, disable_session_recording: true, disable_surveys: true,
+      capture_heatmaps: false, capture_dead_clicks: false, capture_performance: false,
       advanced_disable_feature_flags: true, person_profiles: 'identified_only',
+      // Only the local delivery check captures an automated browser; production keeps bot filtering.
+      opt_out_useragent_filter: import.meta.env.DEV && import.meta.env.VITE_POSTHOG_VERIFY_AUTOMATION === 'true',
       before_send: event => {
         if (!event) return event
         // The browser ingestion envelope requires this public project token.

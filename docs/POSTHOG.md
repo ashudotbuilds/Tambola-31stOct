@@ -37,9 +37,12 @@ Restart/redeploy the backend after changing its runtime configuration.
    must not block login, saving marks, calling questions, or claiming prizes.
 
 Local delivery checks: `npm --prefix backend run posthog:verify` sends one explicit
-installation log. With a configured Vite frontend running on port 5175,
-`node scripts/verify-posthog-browser.mjs` sends a setup event and checks the ingestion
-response (requires Playwright or `PLAYWRIGHT_MODULE`). These checks confirm HTTP
+installation log. Start a dedicated local Vite instance with environment variable
+`VITE_POSTHOG_VERIFY_AUTOMATION=true` and set `AUDIT_WEB_URL` to that instance's URL.
+`node scripts/verify-posthog-browser.mjs` checks the page-view ingestion response
+(requires Playwright or `PLAYWRIGHT_MODULE`). The verification setting only works
+in development and allows the automated browser through the SDK bot filter;
+production always retains bot filtering. These checks confirm HTTP
 acceptance; dashboard visibility can follow after ingestion processing.
 
 Successful fast GETs and health checks are excluded from backend logs. Mutations,
