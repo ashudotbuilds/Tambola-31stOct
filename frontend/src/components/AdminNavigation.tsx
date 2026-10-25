@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import { getCurrentUser, logoutUser } from '@/lib/api'
 import type { AuthMeResult } from '@/shared/types'
 import { GameHeader } from './GameChrome'
+import { BackLink } from './BackLink'
 
 export function useAdminAccount() {
   const [account, setAccount] = useState<AuthMeResult | null>(null)
@@ -31,11 +32,15 @@ export function AdminPage({ account, error, title, description, children }: {
   account: AuthMeResult | null; error: string | null; title: string; description: string; children: ReactNode
 }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
+  const home = account?.principal.type === 'SUPER_ADMIN' ? '/super-admin' : '/admin'
+  const source = (location.state as { backTo?: string } | null)?.backTo
+  const backTo = source && ['/host', '/admin', '/super-admin'].includes(source) ? source : home
   if (!account) return <main className="mx-auto max-w-6xl px-4 py-10">{error ? <><p role="alert" className="text-rose">{error}</p><Link className="btn mt-4" to="/login">Sign in</Link></> : <p role="status">Loading account…</p>}</main>
   return <main className="admin-workspace mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-8">
-    <GameHeader section={account.principal.type.replaceAll('_', ' ')}><button className="btn" disabled={signingOut} onClick={async () => {
+    <GameHeader section={account.principal.type.replaceAll('_', ' ')}>{location.pathname !== home && <BackLink to={backTo} label={backTo === '/host' ? 'Back to game' : 'Back to dashboard'} />}<button className="btn" disabled={signingOut} onClick={async () => {
       setSigningOut(true); setSignOutError(null)
       try { await logoutUser(); navigate('/login', { replace: true }) }
       catch (cause) { setSignOutError(cause instanceof Error ? cause.message : 'Could not sign out'); setSigningOut(false) }

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useNavigate } from 'react-router-dom'
-import { CodeChip, ConnectionDot, StatusPill } from '@/components/Chrome'
+import { CodeChip, GameFooter, StatusPill } from '@/components/Chrome'
+import { BackLink } from '@/components/BackLink'
 import { ClaimButtons } from '@/components/ClaimButtons'
-import { Leaderboard } from '@/components/Leaderboard'
 import { Ticket } from '@/components/Ticket'
 import { LobbyTutorialSimulator } from '@/components/LobbyTutorialSimulator'
 import { sessions, submitClaim } from '@/lib/api'
@@ -13,7 +13,7 @@ import { play } from '@/lib/sound'
 import type { ClaimType, PlayerSession } from '@/lib/types'
 import { cutSet, useGameRoom } from '@/hooks/useGameRoom'
 import { getTechnicalItem, type TechnicalItem } from '@/lib/technicalBank'
-import { ThemeToggle, useTheme } from '@/lib/theme'
+import { useTheme } from '@/lib/theme'
 
 interface Toast {
   id: number
@@ -28,8 +28,8 @@ export default function PlayerScreen() {
   const [ready, setReady] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [busy, setBusy] = useState(false)
-  const [showNumbersOnly, setShowNumbersOnly] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  const [showBatch, setShowBatch] = useState(false)
 
   useEffect(() => {
     const stored = sessions.loadPlayer()
@@ -93,21 +93,20 @@ export default function PlayerScreen() {
         pushToast('bad', 'Could not save your marks. Please reconnect before claiming.')
         return
       }
-      const result = await submitClaim(session.game_id, session.player_token, claim)
-      setBusy(false)
-
-      if (result.accepted) {
-        play('accept')
-        pushToast('good', `${claimLabel(claim)} accepted  +${result.points}`)
+      try {
+        const result = await submitClaim(session.game_id, session.player_token, claim)
+        if (result.accepted) {
+          play('accept')
+          pushToast('good', `${claimLabel(claim)} accepted  +${result.points}`)
+        } else {
+          play('reject')
+          pushToast('info', result.reason ?? 'Claim was not accepted. Check your pattern.')
+        }
         void room.refresh()
-      } else if (result.penalty) {
-        play('reject')
-        const cutInfo = result.cut ? ` · ${result.cut} was cut` : ''
-        pushToast('bad', `${claimLabel(claim)} rejected  −${result.penalty}${cutInfo}`)
-        void room.refresh()
-      } else if (result.reason) {
-        play('reject')
-        pushToast('info', result.reason)
+      } catch (error) {
+        pushToast('bad', error instanceof Error ? error.message : 'Could not submit claim. Please try again.')
+      } finally {
+        setBusy(false)
       }
     },
     [session, busy, room, pushToast, syncMarks],
@@ -128,22 +127,22 @@ export default function PlayerScreen() {
   }
 
   const status = state?.status ?? 'lobby'
-  const call = room.lastCall
+  const call = state?.calls.find(c => c.seq === state.settings.display_seq) ?? room.lastCall
   const callItem = call ? getTechnicalItem(call.number, customBank) : null
   const isCallRevealed = call ? revealedSeqs.has(call.seq) : false
 
-  // All pending unrevealed calls for this game
-  const pendingCalls = (state?.calls ?? []).filter((c) => !revealedSeqs.has(c.seq))
+  // Only the current batch is displayed; past calls still validate claims.
+  const batchCalls = (state?.calls ?? []).filter(c => c.seq >= (state?.settings.question_batch_start ?? 1))
 
   const isLight = theme === 'light'
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-3 px-2.5 py-3 sm:gap-4 sm:px-6 sm:py-6">
+    <main className="player-shell mx-auto flex min-h-dvh w-full max-w-3xl flex-col gap-2 px-2 py-2 sm:gap-4 sm:px-6 sm:py-6">
       {/* Sticky Mobile Question Pill (Shows when user scrolls down to their ticket) */}
       {isScrolled && call && callItem && (
         <div className="fixed top-2 inset-x-2 z-40 sm:hidden">
           <div
-            className={`flex items-center justify-between gap-2 p-2.5 rounded-xl border shadow-xl backdrop-blur-md transition-all ${
+            className={`flex items-center justify-between gap-2 p-2.5 rounded-xl border shadow-xl backdrop-blur-md transition-colors ${
               isCallRevealed
                 ? 'bg-emerald-950/90 border-emerald-500/70 text-emerald-200'
                 : 'bg-panel/95 border-amber-500/70 text-slate-100'
@@ -178,13 +177,13 @@ export default function PlayerScreen() {
             <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan">
               {me?.name ?? session.display_name}
             </p>
-            <h1 className="text-lg sm:text-xl font-black">Technical Tambola</h1>
+            <h1 className="text-base sm:text-xl font-black">Technical Tambola</h1>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ThemeToggle />
+        <div className="player-status flex flex-wrap items-center gap-2">
+
           <StatusPill status={status} />
-          <ConnectionDot connection={room.connection} />
+
         </div>
       </header>
 
@@ -195,39 +194,25 @@ export default function PlayerScreen() {
       )}
 
       {/* Mobile-optimized Game info bar */}
-      <section className="card flex items-center justify-between gap-3 p-3 sm:p-4">
-        <div>
-          <p className="label mb-0.5 text-[10px]">Game Code</p>
-          <CodeChip code={session.code} className="text-base sm:text-xl" />
+      <section className="card flex items-center justify-between gap-2 p-2 sm:p-4">
+        <div className="flex items-center gap-2">
+          <BackLink to="/account" label="Back to player lounge" />
+          <div><p className="label mb-0.5 text-[10px]">Game Code</p>
+          <CodeChip code={session.code} className="text-base sm:text-xl" /></div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setShowNumbersOnly((prev) => !prev)}
-            className="min-h-11 px-2 text-[11px] font-semibold underline text-slate-400 hover:text-cyan"
-            title="Toggle between technical terms and 1-90 numbers"
-          >
-            {showNumbersOnly ? 'Show Terms' : 'Show #'}
-          </button>
-          <div className="text-right">
-            <p className="label mb-0.5 text-[10px]">Score</p>
-            <p className="text-2xl sm:text-3xl font-black tabular-nums text-lime">{me?.score ?? 0}</p>
-            <p className="text-[10px] text-slate-500">
-              {room.myRank
-                ? `rank ${room.myRank} of ${(state?.players ?? []).filter((p) => !p.is_host).length}`
-                : '—'}
-              {me && me.wrong_claims > 0 ? ` · ${me.wrong_claims} cut` : ''}
-            </p>
-          </div>
+        <div className="text-right">
+          <p className="label mb-0.5 text-[10px]">Score</p>
+          <p className="text-xl sm:text-3xl font-black tabular-nums text-lime">{me?.score ?? 0}</p>
         </div>
       </section>
 
       <div aria-label={`${state?.calls.length ?? 0} of 90 questions called`} className="game-progress"><span style={{ width: `${((state?.calls.length ?? 0) / 90) * 100}%` }} /></div>
 
+      {state?.settings.display_seq != null && <p role="status" className="text-sm font-semibold text-amber">The host is showing an earlier question · #{state.settings.display_seq}</p>}
       {/* Active Question / Clue Stage */}
       {call && callItem && (
         <section
-          className={`card relative overflow-hidden p-3.5 sm:p-5 border transition-all ${
+          className={`player-clue card relative overflow-hidden p-2.5 sm:p-5 border transition-colors ${
             isCallRevealed
               ? isLight
                 ? 'border-emerald-300 bg-emerald-50/60 shadow-sm'
@@ -237,7 +222,7 @@ export default function PlayerScreen() {
                 : 'border-amber/50 bg-amber/10'
           }`}
         >
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-edge/30 pb-2 mb-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-edge/30 pb-1.5 mb-1.5 sm:pb-2 sm:mb-2.5">
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-ink/70 text-slate-300">
                 Call #{call.seq}
@@ -253,7 +238,7 @@ export default function PlayerScreen() {
               </span>
             ) : (
               <span className="text-[11px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber animate-pulse">
-                Solve & Tap Your Ticket!
+                Solve & mark
               </span>
             )}
           </div>
@@ -285,76 +270,54 @@ export default function PlayerScreen() {
               </div>
             ) : (
               <p className="text-[11px] sm:text-xs italic text-slate-500 pt-0.5">
-                Decode the question and tap matching cells on your ticket!
+                Solve the clue and mark your answer.
               </p>
             )}
           </div>
         </section>
       )}
 
-      {/* Clubbed questions queue if multiple are pending */}
-      {pendingCalls.length > 1 && (
-        <details className="card p-2.5 sm:p-3 text-xs">
-          <summary className="font-bold text-amber cursor-pointer">
-            📋 {pendingCalls.length} questions currently active in this game (Click to view all)
-          </summary>
-          <div className="mt-2 space-y-1.5">
-            {pendingCalls.map((c) => {
-              const it = getTechnicalItem(c.number, customBank)
-              return (
-                <div key={c.seq} className="p-2 rounded bg-ink/40 border border-edge/60">
-                  <span className="font-mono font-bold text-cyan mr-1.5">#{c.seq}:</span>
-                  <span>{it.clue || c.clue}</span>
-                </div>
-              )
-            })}
-          </div>
-        </details>
-      )}
-
-      {(state?.calls.length ?? 0) > 0 && (
-        <details className="card p-3 sm:p-4">
-          <summary className="cursor-pointer py-2 text-sm font-bold text-cyan">
-            Question and answer history ({revealedSeqs.size} revealed)
-          </summary>
-          <ol className="mt-2 max-h-80 space-y-2 overflow-y-auto" aria-label="Question and answer history">
-            {[...(state?.calls ?? [])].reverse().map((previous) => {
+      {batchCalls.length > 0 && (
+        <section className="player-batch card p-2.5 sm:p-4" aria-label="Current question batch">
+          <h2 className="hidden sm:block text-sm font-bold text-amber">Current batch · {batchCalls.length} question{batchCalls.length === 1 ? '' : 's'}</h2>
+          <button type="button" className="flex min-h-9 w-full items-center justify-between gap-2 text-left text-xs font-bold text-amber sm:hidden" aria-expanded={showBatch} aria-controls="player-batch-list" onClick={() => setShowBatch(open => !open)}>
+            <span>Current batch · {batchCalls.length} questions</span><span>{showBatch ? 'Hide −' : 'View +'}</span>
+          </button>
+          <div id="player-batch-list" className={showBatch ? '' : 'hidden sm:block'}>
+          <p className="mt-1 text-xs text-slate-400">Answers appear when revealed. Once this batch is revealed, the next question starts a fresh batch.</p>
+          <ol className="mt-3 max-h-80 space-y-2 overflow-y-auto">
+            {batchCalls.map(previous => {
               const item = getTechnicalItem(previous.number, customBank)
-              return <li key={previous.seq} className="rounded-lg border border-edge p-3 text-sm">
+              return <li key={previous.seq} className="rounded border border-edge p-3 text-sm">
                 <p className="font-mono text-xs text-cyan">Call #{previous.seq}</p>
                 <p className="mt-1 whitespace-pre-wrap break-words">{previous.clue}</p>
-                {item.codeSnippet && <pre className="mt-2 overflow-x-auto rounded bg-black/80 p-2 text-xs text-lime">{item.codeSnippet}</pre>}
-                {revealedSeqs.has(previous.seq)
-                  ? <p className="mt-2 break-words font-bold text-cyan">Answer: {item.term} (#{previous.number})</p>
-                  : <p className="mt-2 text-xs text-slate-400">Answer waiting for host reveal</p>}
+                {item.codeSnippet && <pre className="mt-2 overflow-x-auto bg-ink p-2 text-xs text-lime">{item.codeSnippet}</pre>}
+                {revealedSeqs.has(previous.seq) && <p className="mt-2 font-bold text-cyan">Answer: {item.term}</p>}
               </li>
             })}
           </ol>
-        </details>
+          </div>
+        </section>
       )}
 
       {/* Interactive Lobby Tutorial & Simulation */}
-      {status === 'lobby' && (
+      {status === 'lobby' && me?.ticket && (
         <LobbyTutorialSimulator
           ticket={me?.ticket ?? null}
-          playerMarked={playerMarked}
-          onToggleCell={handleToggleCell}
           customBank={customBank}
         />
       )}
 
       {/* The Technical Tambola Ticket - Click & Unclick Manual Selection */}
-      <Ticket
+      {status !== 'lobby' && <Ticket
         ticket={me?.ticket ?? null}
         playerMarked={playerMarked}
         cut={cut}
-        latest={isCallRevealed ? call?.number ?? null : null}
         customBank={customBank}
-        onToggleCell={handleToggleCell}
-        showNumbersOnly={showNumbersOnly}
-      />
+        onToggleCell={status === 'playing' || status === 'closing' ? handleToggleCell : undefined}
+      />}
 
-      {/* Claim Buttons: Enabled ONLY when player manually clicked required cells! */}
+      {/* Players decide when to claim; no automatic pattern hints. */}
       {status === 'lobby' ? (
         <div className="rounded-xl border border-amber/50 bg-amber/10 px-4 py-3 text-center text-xs sm:text-sm text-amber flex items-center justify-center gap-2">
           <span className="animate-spin text-base">⏳</span>
@@ -362,9 +325,6 @@ export default function PlayerScreen() {
         </div>
       ) : (
         <ClaimButtons
-          ticket={me?.ticket ?? null}
-          marked={playerMarked}
-          cut={cut}
           state={state}
           won={room.wonClaims}
           taken={room.takenClaims}
@@ -373,14 +333,10 @@ export default function PlayerScreen() {
         />
       )}
 
-      {/* Standings */}
-      <section className="card p-3 sm:p-4">
-        <h2 className="mb-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300">Standings</h2>
-        <Leaderboard players={state?.players ?? []} meId={me?.player_id} limit={8} dense />
-      </section>
+      <GameFooter connection={room.connection} />
 
       {/* Floating toasts */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex flex-col items-center gap-2 px-3">
+      <div className="pointer-events-none fixed inset-x-0 bottom-16 z-50 flex flex-col items-center gap-2 px-3">
         {toasts.map((toast) => (
           <p
             key={toast.id}

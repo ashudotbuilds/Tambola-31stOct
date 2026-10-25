@@ -4,9 +4,11 @@ import {
   getCurrentUser,
   joinGame,
   logoutUser,
+  sessions,
 } from '@/lib/api'
 import { request } from '@/lib/http'
 import { ArrowRight, LogOut } from 'lucide-react'
+import { BackLink } from '@/components/BackLink'
 import { GameHeader, PlaySteps } from '@/components/GameChrome'
 export default function ParticipantHome() {
   const navigate = useNavigate()
@@ -17,6 +19,7 @@ export default function ParticipantHome() {
     ),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
+    [joinError, setJoinError] = useState<string | null>(null),
     [message, setMessage] = useState('')
   useEffect(() => {
     let active = true
@@ -44,6 +47,7 @@ export default function ParticipantHome() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-7 px-4 py-6 sm:px-6 sm:py-8">
       <GameHeader section="Player lounge">
+        {sessions.loadPlayer() && <BackLink to="/play" label="Back to my ticket" text="My ticket" />}
         <button
           className="btn"
           onClick={async () => {
@@ -60,14 +64,18 @@ export default function ParticipantHome() {
         onSubmit={async (event) => {
           event.preventDefault()
           setBusy(true)
+          setJoinError(null)
           setMessage('')
           try {
             await joinGame(code, name)
             navigate('/play')
           } catch (cause) {
-            setMessage(
-              cause instanceof Error ? cause.message : 'Could not join game',
-            )
+            const rawMsg = cause instanceof Error ? cause.message : 'Could not join game'
+            const friendlyMsg =
+              rawMsg.includes('404') || rawMsg.toLowerCase().includes('not found')
+                ? 'This game code does not exist or has been ended by the host.'
+                : rawMsg
+            setJoinError(friendlyMsg)
           } finally {
             setBusy(false)
           }
@@ -78,6 +86,12 @@ export default function ParticipantHome() {
           Enter the host’s code. Practice with the tutorial while
           waiting for the game to start.
         </p>
+        {joinError && (
+          <div role="alert" className="rounded-xl border border-rose/50 bg-rose/10 px-4 py-3 text-sm font-semibold text-rose flex items-start gap-2">
+            <span className="text-base leading-none">⚠️</span>
+            <span>{joinError}</span>
+          </div>
+        )}
         <label className="block text-sm">
           Game code
           <input
@@ -87,7 +101,10 @@ export default function ParticipantHome() {
             autoCapitalize="characters"
             spellCheck={false}
             value={code}
-            onChange={(event) => setCode(event.target.value.toUpperCase())}
+            onChange={(event) => {
+              setCode(event.target.value.toUpperCase())
+              if (joinError) setJoinError(null)
+            }}
             required
             minLength={6}
             maxLength={6}

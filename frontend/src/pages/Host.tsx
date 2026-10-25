@@ -1,17 +1,19 @@
+import { BackLink } from '@/components/BackLink'
 import { Results } from '@/features/host/Results'
-import { ArrowLeft, BookOpen, MonitorUp, Volume2, VolumeX } from 'lucide-react'
+import { BookOpen, Check, Copy, MonitorUp, QrCode, Volume2, VolumeX, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useNavigate } from 'react-router-dom'
 import QRCode from 'qrcode'
 import { ClueStage, type CluePhase } from '@/components/ClueStage'
-import { CodeChip, ConnectionDot, StatusPill } from '@/components/Chrome'
+import { CodeChip, GameFooter, StatusPill } from '@/components/Chrome'
 import { ClaimFeed } from '@/components/ClaimFeed'
 import { Leaderboard } from '@/components/Leaderboard'
 import { NumberBoard } from '@/components/NumberBoard'
 import { QuestionBankModal } from '@/components/QuestionBankModal'
 import {
   drawNumber,
+  displayQuestion,
   revealCalls,
   sessions,
   setGameStatus,
@@ -20,6 +22,7 @@ import {
 } from '@/lib/api'
 import { play, primeAudio, setMuted, speak, stopSpeaking } from '@/lib/sound'
 import type { HostSession } from '@/lib/types'
+import { claimLabel } from '@/lib/claims'
 import { useGameRoom } from '@/hooks/useGameRoom'
 import {
   getActiveBank,
@@ -27,7 +30,7 @@ import {
   saveLocalCustomBank,
   type TechnicalItem,
 } from '@/lib/technicalBank'
-import { ThemeToggle, useTheme } from '@/lib/theme'
+import { useTheme } from '@/lib/theme'
 
 export default function HostScreen() {
   const navigate = useNavigate()
@@ -36,11 +39,13 @@ export default function HostScreen() {
   const [ready, setReady] = useState(false)
   const [phase, setPhase] = useState<CluePhase>('idle')
   const [busy, setBusy] = useState(false)
+  const [reviewSeq, setReviewSeq] = useState<number | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [speakClues, setSpeakClues] = useState(false)
   const [muted, setMutedState] = useState(false)
   const [qr, setQr] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [showQrModal, setShowQrModal] = useState(false)
   const [isBankModalOpen, setIsBankModalOpen] = useState(false)
   const [customBank, setCustomBank] = useState<TechnicalItem[]>(() => getActiveBank())
 
@@ -58,7 +63,14 @@ export default function HostScreen() {
 
   const room = useGameRoom(gameId, session?.player_token ?? null, {
     onCall: (event) => {
+      setReviewSeq(null)
       if (speakClues) speak(event.clue)
+    },
+    onClaim: (event) => {
+      if (event.status === 'rejected') {
+        setMessage(`Incorrect claim: ${event.name} · ${claimLabel(event.claim_type)}. Warning issued; no points deducted or cells cut.`)
+        play('reject')
+      }
     },
     onStatus: (event) => {
       if (event.status === 'finished') {
@@ -89,7 +101,8 @@ export default function HostScreen() {
     [state?.calls, revealedSeqs],
   )
 
-  const activeCall = room.lastCall
+  const displayedCall = state?.calls.find(c => c.seq === state.settings.display_seq) ?? room.lastCall
+  const activeCall = (reviewSeq === null ? null : state?.calls.find(c => c.seq === reviewSeq)) ?? displayedCall
   const isActiveCallRevealed = activeCall ? revealedSeqs.has(activeCall.seq) : false
 
   // QR code for projector and players
@@ -120,6 +133,21 @@ export default function HostScreen() {
       setBusy(false)
     }
   }, [session, busy])
+
+  const showQuestion = async (seq: number | null) => {
+    if (!session || busy) return
+    setBusy(true)
+    setMessage(null)
+    try {
+      await displayQuestion(session.game_id, session.host_token, seq)
+      setReviewSeq(null)
+      await room.refresh()
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not show question')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   // Reveal a specific call by sequence number
   const handleRevealSingle = useCallback(
@@ -176,7 +204,7 @@ export default function HostScreen() {
     const onKey = (event: KeyboardEvent) => {
       if (isBankModalOpen || event.repeat) return
       const target = event.target as HTMLElement | null
-      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
+      if (target?.closest('input, textarea, select, button, a, summary, [contenteditable=true]')) return
       if (event.code === 'Space') {
         event.preventDefault()
         void call()
@@ -260,27 +288,56 @@ export default function HostScreen() {
   }
 
   const canCall = status === 'playing' || status === 'closing'
-  const callBlocked = !canCall || busy
+  const callBlocked = !canCall || busy || (state?.calls.length ?? 0) >= 90
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col gap-4 px-3 py-4 sm:px-6 sm:py-6">
       {/* Header */}
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link to="/admin" className="text-sm font-black tracking-tight text-slate-500 hover:text-cyan">
-            <ArrowLeft size={18} aria-label="Back to administration" />
-          </Link>
+          <BackLink to="/admin" label="Back to games" />
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan">Host console</p>
-            <h1 className="text-xl font-black sm:text-2xl">Technical Tambola</h1>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-xl font-black sm:text-2xl">Technical Tambola</h1>
+              <button
+                type="button"
+                onClick={onCopyLink}
+                title="Click to copy join link"
+                className="group inline-flex items-center gap-1.5 rounded-lg border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-xs font-bold text-cyan transition hover:border-cyan hover:bg-cyan/20 active:scale-95"
+              >
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Code:</span>
+                <span className="font-mono text-sm sm:text-base font-black tracking-widest text-cyan">{session.code}</span>
+                {copied ? (
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-lime">
+                    <Check size={13} />
+                    <span>Copied!</span>
+                  </span>
+                ) : (
+                  <Copy size={13} className="text-slate-400 group-hover:text-cyan transition-colors" />
+                )}
+              </button>
+              {qr && (
+                <button
+                  type="button"
+                  onClick={() => setShowQrModal(true)}
+                  title="Show QR Code"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-xs font-bold text-cyan transition hover:border-cyan hover:bg-cyan/20 active:scale-95"
+                >
+                  <QrCode size={13} />
+                  <span>QR</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <ThemeToggle />
-          <StatusPill status={status} />
-          <ConnectionDot connection={room.connection} />
 
+          <StatusPill status={status} />
+
+
+          <Link className="btn text-xs" to={`/admin/audit?game=${session.game_id}`} state={{ backTo: '/host' }}>Game audit</Link>
           <button
             type="button"
             onClick={() => setIsBankModalOpen(true)}
@@ -310,7 +367,7 @@ export default function HostScreen() {
         </p>
       )}
       {message && (
-        <p className="rounded-xl border border-amber/50 bg-amber/10 px-4 py-2 text-sm text-amber">
+        <p role="alert" className="rounded-xl border border-amber/50 bg-amber/10 px-4 py-2 text-sm text-amber">
           {message}
         </p>
       )}
@@ -351,17 +408,19 @@ export default function HostScreen() {
 
           <div className="card flex flex-col gap-3 p-4">
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">In the lobby</h2>
-            <Leaderboard players={players} dense className="max-h-[50vh] overflow-y-auto" />
+            <Leaderboard players={nonHosts} dense className="max-h-[50vh] overflow-y-auto" />
           </div>
         </section>
       ) : (
         <>
           <section className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div className="flex min-w-0 flex-col gap-4">
+              {reviewSeq !== null && <p className="text-sm text-amber">Reviewing an earlier question. Players and projector stay on the live question.</p>}
+              {reviewSeq === null && state?.settings.display_seq != null && <p role="status" className="text-sm text-cyan">Showing question #{state.settings.display_seq} to all players and the projector.</p>}
               {/* Main Clue Stage with Question & Answer preview */}
               <ClueStage
-                call={room.lastCall}
-                speakClues={speakClues}
+                call={activeCall}
+                speakClues={false}
                 isHost={true}
                 isRevealed={isActiveCallRevealed}
                 customBank={customBank}
@@ -369,18 +428,23 @@ export default function HostScreen() {
                 onRevealNow={
                   activeCall ? () => handleRevealSingle(activeCall.seq) : undefined
                 }
-                onNextQuestion={call}
               />
 
               {/* Host Main Action Controls */}
               <div className="card flex flex-wrap items-center gap-3 p-4">
+                <button type="button" className="btn text-xs" disabled={busy || !activeCall || activeCall.seq <= 1}
+                  onClick={() => { if (activeCall) setReviewSeq(activeCall.seq - 1) }}>Previous Question</button>
+                {(reviewSeq !== null || state?.settings.display_seq != null) && <button type="button" className="btn text-xs" disabled={busy} onClick={() => void showQuestion(null)}>Back to live</button>}
                 <button
                   type="button"
                   className="btn btn-primary w-full flex-none text-sm font-bold sm:w-auto sm:flex-1 sm:text-base"
-                  disabled={callBlocked}
-                  onClick={call}
+                  disabled={reviewSeq === null ? callBlocked : busy}
+                  onClick={() => {
+                    if (reviewSeq !== null) setReviewSeq(reviewSeq + 1 >= (room.lastCall?.seq ?? 0) ? null : reviewSeq + 1)
+                    else void call()
+                  }}
                 >
-                  {status === 'finished'
+                  {reviewSeq !== null ? 'Next Question' : status === 'finished'
                     ? 'Game over'
                     : status === 'paused'
                       ? 'Paused'
@@ -437,22 +501,29 @@ export default function HostScreen() {
                     {[...(state?.calls ?? [])].reverse().map((c) => {
                       const it = getTechnicalItem(c.number, customBank)
                       const isRev = revealedSeqs.has(c.seq)
+                      const isShowing = displayedCall?.seq === c.seq
                       return (
                         <div
                           key={c.seq}
                           className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border text-xs ${
-                            isRev
+                            isShowing
+                              ? 'border-lime bg-lime/15 text-slate-100 ring-1 ring-inset ring-lime/60'
+                              : isRev
                               ? 'border-edge/60 bg-ink/30 text-slate-400'
                               : 'border-amber/50 bg-amber/10 text-amber-200'
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
+                          <button type="button" disabled={busy} onClick={() => void showQuestion(c.seq)}
+                            aria-label={`Show question ${c.seq} to players`}
+                            aria-pressed={isShowing}
+                            className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded text-left enabled:hover:text-cyan focus-visible:outline focus-visible:outline-cyan">
                             <span className="font-mono font-bold text-slate-400">#{c.seq}</span>
                             <span className="font-bold text-cyan">{it.term}</span>
                             <span className="truncate text-slate-400 max-w-sm sm:max-w-md">
                               {it.clue || c.clue}
                             </span>
-                          </div>
+                            <span className={`shrink-0 rounded px-1.5 py-1 text-[10px] ${isShowing ? 'bg-lime text-ink font-bold' : 'text-cyan'}`}>{isShowing ? 'Showing' : 'Show'}</span>
+                          </button>
 
                           <div className="flex items-center gap-2 shrink-0">
                             {isRev ? (
@@ -491,14 +562,16 @@ export default function HostScreen() {
               </div>
               <div className="card p-4">
                 <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-300">Standings</h2>
-                <Leaderboard players={players} limit={12} dense className="max-h-[38vh] overflow-y-auto" />
+                <Leaderboard players={nonHosts} limit={12} dense className="max-h-[38vh] overflow-y-auto" />
               </div>
             </aside>
           </section>
 
-          {status === 'finished' ? <Results players={players} state={state} customBank={customBank} /> : null}
+          {status === 'finished' ? <Results players={nonHosts} state={state} customBank={customBank} /> : null}
         </>
       )}
+
+      <GameFooter connection={room.connection} />
 
       {/* Question Bank Modal */}
       <QuestionBankModal
@@ -507,6 +580,58 @@ export default function HostScreen() {
         currentBank={customBank}
         onSaveBank={handleSaveBank}
       />
+
+      {/* Host QR Code Modal */}
+      {showQrModal && qr && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setShowQrModal(false)}
+        >
+          <div
+            className="card flex flex-col items-center gap-4 p-6 sm:p-8 border-cyan/50 text-center max-w-sm shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="text-xs font-bold uppercase tracking-[0.25em] text-cyan">Join Game QR</span>
+              <button
+                type="button"
+                onClick={() => setShowQrModal(false)}
+                className="rounded p-1 text-slate-400 hover:text-white"
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="rounded-2xl bg-white p-4 shadow-2xl">
+              <img
+                src={qr}
+                alt={`Scan QR code to join game ${session.code}`}
+                className="h-56 w-56 sm:h-64 sm:w-64"
+              />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-slate-400">Game Code</p>
+              <p className="font-mono text-3xl font-black tracking-widest text-cyan">{session.code}</p>
+            </div>
+            <div className="flex w-full gap-2">
+              <button
+                type="button"
+                onClick={onCopyLink}
+                className="btn text-xs flex-1"
+              >
+                {copied ? 'Link copied!' : 'Copy join link'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowQrModal(false)}
+                className="btn btn-primary text-xs flex-1"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

@@ -25,7 +25,7 @@
     ]
   },
   "design": {
-    "colorMode": "dark default, optional warm light",
+    "colorMode": "dark only",
     "colors": {
       "background": "#161513",
       "surface": "#211f1b",
@@ -42,7 +42,7 @@
     "radius": {},
     "shadows": {},
     "motion": {
-      "duration": "100–180ms",
+      "duration": "100\u2013180ms",
       "reducedMotion": true
     },
     "density": "compact readable"
@@ -56,7 +56,7 @@
     "must": [
       "Mobile first, 320px minimum viewport",
       "Preserve all game behavior and routes",
-      "Dark mode default, orange primary actions",
+      "Dark mode only, orange primary actions",
       "Only Technical Tambola product name, no logo",
       "Self-host fonts, no new environment variables"
     ],
@@ -76,6 +76,14 @@
     {
       "date": "2026-10-23",
       "decision": "Use established React primitives; adopt tactile interaction inspiration from 21st Retro Button and terminal-panel references from Indie Bytes. MCP catalog unavailable; no unverified component code imported."
+    },
+    {
+      "date": "2026-10-25",
+      "decision": "Dark only; isolated lobby simulation, manual claims without eligibility hints, and a transposed 9-row by 3-column phone ticket. Preserve canonical claim rows with Top/Middle/Bottom column labels."
+    },
+    {
+      "date": "2026-10-25",
+      "decision": "Compact phone play view: 44px ticket cells show the complete 9-by-3 ticket in one viewport; smaller three-column claim controls and collapsed question batches below the ticket. Full terms remain available through tap inspection and accessible names. Desktop sizing unchanged."
     }
   ],
   "evidence": [

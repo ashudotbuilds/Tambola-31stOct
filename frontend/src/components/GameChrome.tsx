@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react'
 import { ArrowUpRight, Check, Grid3X3, MoveRight } from 'lucide-react'
-import { ThemeToggle } from '@/lib/theme'
 
 export function GameHeader({ section, children }: { section?: string; children?: ReactNode }) {
   return <header className="game-header">
     <div className="min-w-0"><p className="game-wordmark">Technical Tambola</p>{section && <p className="eyebrow mt-1">{section}</p>}</div>
-    <div className="flex flex-wrap items-center gap-2"><ThemeToggle />{children}</div>
+    <div className="flex flex-wrap items-center gap-2">{children}</div>
   </header>
 }
 

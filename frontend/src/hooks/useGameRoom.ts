@@ -37,8 +37,9 @@ export function useGameRoom(gameId: string | null, token: string | null | undefi
   const previous = useRef<GameState | null>(null)
   const requestId = useRef(0)
   const active = useRef(true)
+  const deleted = useRef(false)
   const load = useCallback(async () => {
-    if (!gameId) return
+    if (!gameId || deleted.current) return
     const id = ++requestId.current
     try {
       const next = await getGameState(gameId, token)
@@ -62,6 +63,7 @@ export function useGameRoom(gameId: string | null, token: string | null | undefi
 
   useEffect(() => {
     active.current = true
+    deleted.current = false
     previous.current = null
     setState(null)
     setError(null)
@@ -76,6 +78,12 @@ export function useGameRoom(gameId: string | null, token: string | null | undefi
     socket.on('connect_error', () => setConnection('offline'))
     socket.on('presence', (count: number) => setConnected(count))
     socket.on('game_changed', () => { void load() })
+    socket.on('game_deleted', () => {
+      deleted.current = true
+      requestId.current++
+      setState(current => current ? { ...current, status: 'finished' } : current)
+      setError('This game was deleted by its administrator.')
+    })
     const timer = setInterval(() => { void load() }, 15_000)
     const onVisible = () => { if (document.visibilityState === 'visible') void load() }
     document.addEventListener('visibilitychange', onVisible)

@@ -113,12 +113,20 @@ export interface AdminDashboard {
   socketConnections: number
 }
 export async function getAdminDashboard(): Promise<AdminDashboard> { return request('/v1/admin/dashboard') }
-export interface AuditEntry { id: string; actorId: string | null; action: string; resourceType: string; resourceId: string | null; metadata: Record<string, unknown>; createdAt: string }
-export async function listAudit(input: { cursor?: string; limit?: number; actorId?: string; action?: string; from?: string; to?: string } = {}): Promise<{ ok: true; entries: AuditEntry[]; nextCursor: string | null }> {
+export interface AuditEntry {
+  id: string; actorId: string | null; actorName: string | null; actorEmail: string | null
+  targetName: string | null; targetEmail: string | null; gameCode: string | null
+  action: string; resourceType: string; resourceId: string | null; metadata: Record<string, unknown>
+  createdAt: string; ipAddress: string | null; userAgent: string | null; suspicious: boolean
+}
+export interface AuditFilters { cursor?: string; limit?: number; search?: string; gameId?: string; suspicious?: boolean; action?: string; from?: string; to?: string }
+export interface AuditResult { ok: true; entries: AuditEntry[]; nextCursor: string | null; game: { code: string; host: string | null; status: string; deleted: boolean } | null }
+export async function listAudit(input: AuditFilters = {}): Promise<AuditResult> {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(input)) if (value !== undefined && value !== '') query.set(key, String(value))
   return request(`/v1/admin/audit${query.size ? `?${query}` : ''}`)
 }
+export const deleteAccountGame = (gameId: string, code: string) => request<{ ok: true }>(`/games/${encodeURIComponent(gameId)}`, { method: 'DELETE', body: { code } })
 export async function getSystemDiagnostics(): Promise<{ ok: true; version: string | null; nodeVersion: string; readiness: boolean | null; latestMigration: string | null }> {
   return request('/v1/super-admin/system')
 }
@@ -148,6 +156,8 @@ export const startGame = (gameId: string, token: string) => request<{ status: st
 export const drawNumber = (gameId: string, token: string) => request<DrawResult>(`/games/${gameId}/calls`, { method: 'POST', token })
 export const setGameStatus = (gameId: string, token: string, status: 'paused' | 'playing' | 'finished') =>
   request<{ status: string }>(`/games/${gameId}/status`, { method: 'PATCH', token, body: { status } })
+export const displayQuestion = (gameId: string, token: string, seq: number | null) =>
+  request<{ ok: boolean; display_seq: number | null }>(`/games/${gameId}/display`, { method: 'PUT', token, body: { seq } })
 export const revealCalls = (gameId: string, token: string, seqs: number[]) =>
   request<{ ok: boolean; revealed_seqs: number[] }>(`/games/${gameId}/reveals`, { method: 'PUT', token, body: { seqs } })
 export const updateGameBank = (gameId: string, token: string, bank: unknown) =>

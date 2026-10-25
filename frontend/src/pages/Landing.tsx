@@ -5,7 +5,6 @@ import { createGame, joinGame, sessions } from '@/lib/api'
 import { isConfigured } from '@/lib/config'
 import { primeAudio } from '@/lib/sound'
 
-import { ThemeToggle } from '@/lib/theme'
 
 export default function Landing() {
   const navigate = useNavigate()
@@ -65,7 +64,12 @@ export default function Landing() {
       await joinGame(code, playerName)
       navigate('/play')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not join the game')
+      const rawMsg = err instanceof Error ? err.message : 'Could not join the game'
+      const friendlyMsg =
+        rawMsg.includes('404') || rawMsg.toLowerCase().includes('not found')
+          ? 'This game code does not exist or has been ended by the host.'
+          : rawMsg
+      setError(friendlyMsg)
     } finally {
       setBusy(null)
     }
@@ -73,9 +77,6 @@ export default function Landing() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:py-14">
-      <div className="flex justify-end">
-        <ThemeToggle />
-      </div>
       <header className="text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.4em] text-cyan">ACM Engineering Day</p>
         <h1 className="mt-3 text-4xl font-black leading-none sm:text-6xl">
@@ -201,7 +202,7 @@ export default function Landing() {
             },
             {
               t: '3. Shout your claim',
-              d: 'Lines, corners and the full house pay points. A wrong claim costs 10 and cuts one of your numbers.',
+              d: 'Lines, corners and the full house pay points. Incorrect claims give a warning and notify the host, with no points deducted or cells cut.',
             },
           ].map((step) => (
             <div key={step.t}>

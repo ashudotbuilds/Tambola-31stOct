@@ -8,7 +8,7 @@ Generated from project sources at 2026-10-23T11:29:45.472Z.
 - Name: Technical Tambola
 - Product type: Multiplayer technical clue game
 - Stack: React 19, Vite, TypeScript, Tailwind CSS 3
-- Color mode: Dark by default; saved light preference supported
+- Color mode: Dark only
 - Density: Compact, readable, mobile first
 
 ## Sources
@@ -26,7 +26,7 @@ Generated from project sources at 2026-10-23T11:29:45.472Z.
 ## Tokens
 
 Background #161513; surface #211f1b; border #454038; accent #ff8a4c;
-foreground #f2ebdf. Warm light mode is retained.
+foreground #f2ebdf. The game uses dark mode only.
 
 ## Constraints
 

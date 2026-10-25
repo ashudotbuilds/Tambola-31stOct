@@ -9,7 +9,8 @@ interface Props {
 }
 
 export function Leaderboard({ players, meId, limit, className = '', dense = false }: Props) {
-  const rows = (limit ? players.slice(0, limit) : players).map((p, i) => ({ ...p, rank: i + 1 }))
+  const userPlayers = players.filter((p) => !p.is_host)
+  const rows = (limit ? userPlayers.slice(0, limit) : userPlayers).map((p, i) => ({ ...p, rank: i + 1 }))
 
   if (rows.length === 0) {
     return <p className={`text-sm text-slate-500 ${className}`}>Nobody has joined yet.</p>
@@ -38,7 +39,6 @@ export function Leaderboard({ players, meId, limit, className = '', dense = fals
             </span>
             <span className="min-w-0 flex-1 truncate font-semibold">
               {p.name}
-              {p.is_host ? <span className="ml-1.5 text-[10px] font-normal uppercase text-cyan">host</span> : null}
               {p.wrong_claims > 0 ? (
                 <span className="ml-1.5 text-[10px] font-normal text-rose">{p.wrong_claims} cut</span>
               ) : null}

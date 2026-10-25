@@ -10,14 +10,6 @@
   --button-shadow: #0e0d0b;
 }
 
-html.light {
-  color-scheme: light;
-  --paper: #f1ebdf;
-  --muted: #6e6153;
-  --accent: #ad400d;
-  --button-shadow: #d4c7b5;
-}
-
 html,
 body {
   height: 100%;
@@ -28,10 +20,6 @@ body {
   background: var(--paper);
   font-size: 15px;
   -webkit-tap-highlight-color: transparent;
-}
-
-html.light body {
-  @apply text-slate-800;
 }
 
 ::selection { background: #ff8a4c; color: #161513; }
@@ -47,11 +35,6 @@ pre { tab-size: 2; }
     @apply rounded-xl border border-edge bg-panel;
   }
 
-  html.light .card {
-    @apply border-slate-300 text-slate-800;
-    background: #f8f3e9;
-  }
-
   .btn {
     @apply inline-flex min-h-11 select-none items-center justify-center gap-2 rounded-md border border-edge
            bg-panel px-4 py-3 font-mono text-xs font-normal text-slate-200
@@ -65,26 +48,13 @@ pre { tab-size: 2; }
 
   .btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--button-shadow); }
 
-  html.light .btn {
-    @apply border-slate-300 text-slate-800 hover:border-cyan;
-    background: #f8f3e9;
-  }
-
   .btn-primary {
     @apply border-cyan bg-cyan text-ink hover:bg-[#ff9c68] hover:text-ink;
     box-shadow: 0 3px 0 #9c461b;
   }
 
-  html.light .btn-primary {
-    @apply border-[#a83c0b] bg-[#ba4a17] text-white hover:bg-[#a83c0b] hover:text-white;
-  }
-
   .btn-danger {
     @apply border-rose/70 bg-rose/15 text-rose hover:bg-rose/25;
-  }
-
-  html.light .btn-danger {
-    @apply border-rose/80 bg-rose/15 text-rose hover:bg-rose/25;
   }
 
   .field {
@@ -92,18 +62,10 @@ pre { tab-size: 2; }
            placeholder:text-slate-500 focus:border-cyan focus:outline-none focus:ring-1 focus:ring-cyan focus-visible:ring-2 focus-visible:ring-cyan;
   }
 
-  html.light .field {
-    @apply border-slate-300 text-slate-900 placeholder:text-slate-600 focus:border-cyan;
-    background: #fffcf6;
-  }
-
   .label {
     @apply mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400;
   }
 
-  html.light .label {
-    @apply text-slate-500;
-  }
 }
 
 .game-header { @apply flex flex-wrap items-center justify-between gap-4 border-b border-edge pb-5; }
@@ -141,8 +103,6 @@ pre { tab-size: 2; }
   .admin-page-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
   .admin-page-nav a { white-space: normal; display: flex; align-items: center; }
 }
-html.light .ticket-preview, html.light .login-form { background: #f8f3e9; }
-html.light .ticket-preview { box-shadow: 6px 6px 0 #d4c7b5; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -152,21 +112,6 @@ html.light .ticket-preview { box-shadow: 6px 6px 0 #d4c7b5; }
     scroll-behavior: auto !important;
   }
 }
-
-/* Keep muted copy and accent text readable against light surfaces. */
-html.light .text-slate-400 {
-  color: #6e6153;
-}
-
-html.light .text-slate-300 {
-  color: #655a4c;
-}
-
-html.light [class~="text-cyan"] {
-  color: #ad400d;
-}
-
-html.light .btn-primary { color: #fff; }
 
 /* A ticket cell that can display technical terms, outputs, or numbers */
 @layer utilities {
@@ -186,3 +131,24 @@ html.light .btn-primary { color: #fff; }
   }
 }
 
+/* Transpose the visual ticket on phones while preserving canonical claim rows. */
+.ticket-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.ticket-cell { position: relative; display: flex; min-width: 0; min-height: 76px; align-items: center; justify-content: center; border-width: 1px; border-radius: 4px; grid-column: var(--ticket-row); grid-row: var(--ticket-col); touch-action: manipulation; }
+.ticket-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ticket-blank { border-color: #45403880; background: #16151380; color: #454038; border-style: dashed; }
+@media (min-width: 640px) {
+  .ticket-grid { grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 6px; }
+  .ticket-cell { grid-column: var(--ticket-col); grid-row: var(--ticket-row); min-height: 88px; }
+}
+
+@media (max-width: 639px) {
+  /* Keep the complete 9 × 3 ticket in one phone viewport, including inspection. */
+  .ticket-grid { gap: 4px; }
+  .ticket-cell { height: 44px; min-height: 44px; overflow: hidden; }
+  .ticket-term { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  .ticket-help { height: 22px; }
+  .player-status > span { min-height: 30px; padding: 4px 7px; font-size: 10px; letter-spacing: 0; }
+  .player-clue pre { max-height: 96px; }
+  .player-batch { order: 1; }
+  .player-shell > footer { order: 2; padding-block: 10px; font-size: 10px; }
+}

@@ -23,8 +23,8 @@ export function StatusPill({ status }: { status: GameStatus }) {
     finished: 'bg-rose/20 text-rose',
   }
   return (
-    <span className={`rounded-md px-2 py-1 text-[11px] font-bold uppercase tracking-wider ${map[status]}`}>
-      {status === 'closing' ? 'closing' : status}
+    <span className={`inline-flex min-h-12 items-center rounded-md border border-current/30 px-4 py-2 text-base sm:text-lg font-bold uppercase tracking-wider ${map[status]}`}>
+      {{ lobby: 'Waiting in lobby', playing: 'Game on · Playing', paused: 'Game paused', closing: 'Game on · Final round', finished: 'Game ended' }[status]}
     </span>
   )
 }
@@ -38,4 +38,10 @@ export function CodeChip({ code, className = '' }: { code: string; className?: s
       {code}
     </span>
   )
+}
+
+export function GameFooter({ connection }: { connection: Connection }) {
+  return <footer className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-edge py-4 text-xs text-slate-400">
+    <span>Built by MU-ACM Chapter</span><ConnectionDot connection={connection} />
+  </footer>
 }

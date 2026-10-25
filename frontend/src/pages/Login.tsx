@@ -4,7 +4,6 @@ import { loginUser } from '@/lib/api'
 import { request } from '@/lib/http'
 import { ArrowRight, Eye, EyeOff, LoaderCircle } from 'lucide-react'
 import { TicketPreview, PlaySteps } from '@/components/GameChrome'
-import { ThemeToggle } from '@/lib/theme'
 
 type DemoAccount = { id: string; name: string; email: string; role: string }
 export default function Login() {
@@ -52,7 +51,7 @@ export default function Login() {
   }
   return (
     <main className="login-shell">
-      <header className="flex items-center justify-between gap-3 border-b border-edge py-5"><span className="eyebrow">Clues. Tickets. Full house.</span><ThemeToggle /></header>
+      <header className="flex items-center justify-between gap-3 border-b border-edge py-5"><span className="eyebrow">Clues. Tickets. Full house.</span></header>
       <div className="login-layout">
       <section className="min-w-0">
         <p className="eyebrow mb-5 text-cyan">A classic game. A technical twist.</p>

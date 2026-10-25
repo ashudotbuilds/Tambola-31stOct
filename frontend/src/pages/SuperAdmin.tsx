@@ -24,7 +24,7 @@ export default function SuperAdmin() {
     {loadError && <p role="alert" className="card p-4 text-rose">{loadError}</p>}
     {system && <section className="card p-5"><h2 className="text-xl font-bold">System diagnostics</h2><dl className="mt-4 grid gap-5 text-sm sm:grid-cols-2 lg:grid-cols-3">{[
       ['Application version', system.version ?? 'Unavailable'], ['Node runtime', system.nodeVersion], ['Readiness', system.readiness ? 'Ready' : 'Not ready'], ['Latest migration', system.latestMigration ?? 'Unavailable'],
-    ].map(([label, value]) => <div key={String(label)}><dt className="text-slate-400">{label}</dt><dd className="mt-1 break-words">{value}</dd></div>)}</dl></section>}
+    ].map(([label, value]) => <div className="min-w-0" key={String(label)}><dt className="text-slate-400">{label}</dt><dd className="mt-1 break-all">{value}</dd></div>)}</dl></section>}
     {dashboardError && <p role="alert" className="card p-4 text-rose">{dashboardError}</p>}
     <AdminGames games={games} loading={gamesLoading} refresh={refresh} />
     {dashboard && <section className="card p-5"><h2 className="text-xl font-bold">Operations overview</h2><dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">{[

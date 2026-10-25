@@ -57,6 +57,10 @@ export interface Settings {
   reveal_seconds?: number
   pause_after_calls?: number
   closing_seq?: number
+  /** First call in the visible batch. */
+  /** Host-selected historical call shown to everyone; null follows the latest call. */
+  display_seq?: number | null
+  question_batch_start?: number
   revealed_seqs?: number[]
   custom_bank?: unknown
 }
