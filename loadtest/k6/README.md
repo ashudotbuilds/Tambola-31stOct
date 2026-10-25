@@ -33,10 +33,11 @@ cleanup, remove the game named `k6 Load Test` from the admin game list.
 
 ## Increase gradually
 
-Only after the smoke run succeeds, run 5, then 10, then 25 virtual users. Set
-`MAX_VUS` to each value. For the 100-user run, set it to `100`. Each virtual user
-polls game updates roughly once per second. Watch k6's p95 duration and failures,
-along with Heroku dyno CPU/memory, request logs, and Neon query/connection metrics.
+Only after the smoke run succeeds, run `MAX_VUS` at `10`, `15`, `20`, `50`, and
+`100`, in that order. Each run ramps through all earlier checkpoints and holds
+at its selected maximum for one minute. Each virtual user polls game updates
+roughly once per second. Watch k6's p95 duration and failures, along with Heroku
+dyno CPU/memory, request logs, and Neon query/connection metrics.
 
 Use a quiet time and an isolated testing database when possible. A load run writes
 a login audit/session and creates then soft-deletes a test game. Do not point this

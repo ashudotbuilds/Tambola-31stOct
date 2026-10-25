@@ -4,20 +4,18 @@ import { check, sleep } from 'k6'
 const baseUrl = (__ENV.BASE_URL || '').replace(/\/+$/, '')
 const loginId = __ENV.ADMIN_LOGIN
 const password = __ENV.ADMIN_PASSWORD
-const maxVus = Math.max(1, Number(__ENV.MAX_VUS || 100))
+const maxVus = Number(__ENV.MAX_VUS || 100)
+const supportedTargets = [10, 15, 20, 50, 100]
+if (!supportedTargets.includes(maxVus)) {
+  throw new Error(`MAX_VUS must be one of: ${supportedTargets.join(', ')}`)
+}
 
-const rampTargets = [...new Set([
-  1,
-  Math.ceil(maxVus / 10),
-  Math.ceil(maxVus / 4),
-  Math.ceil(maxVus / 2),
-  maxVus,
-])]
+const rampTargets = [1, ...supportedTargets.filter(target => target <= maxVus)]
 
 export const options = {
   stages: [
     ...rampTargets.map((target, index) => ({
-      duration: maxVus <= 10 ? '10s' : index === rampTargets.length - 1 ? '1m' : '20s',
+      duration: index === rampTargets.length - 1 ? '1m' : '20s',
       target,
     })),
     { duration: '15s', target: 0 },
