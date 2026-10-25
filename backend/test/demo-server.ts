@@ -23,7 +23,7 @@ const passwordHash = await hashPassword('DemoPass123!')
 for (const [role, count, prefix] of [
   ['SUPER_ADMIN', 1, 'superadmin'],
   ['ADMIN', 3, 'admin'],
-  ['PARTICIPANT', 20, 'user'],
+  ['PARTICIPANT', 50, 'user'],
 ] as const) {
   for (let i = 1; i <= count; i++) {
     const id = prefix === 'superadmin' ? prefix : `${prefix}${i}`

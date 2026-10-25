@@ -17,7 +17,7 @@ test('production shortcuts provision real roles, survive redeployment, and disab
     const real = await createUser(db, 'real@example.test', await hashPassword('RealPassword123!'), 'Real Admin')
     await createAdminProfile(db, real.id, 'SUPER_ADMIN')
     const accounts = await configureTestingAccounts(db, true)
-    assert.equal(accounts?.length, 24)
+    assert.equal(accounts?.length, 54)
     process.env.NODE_ENV = 'production'
     application = createApplication(db, { origins: ['https://tambola.example'], demoAccounts: accounts })
     await new Promise<void>(resolve => application!.server.listen(0, '127.0.0.1', resolve))
@@ -52,7 +52,7 @@ test('production shortcuts provision real roles, survive redeployment, and disab
     await configureTestingAccounts(db, true)
     assert.equal((await application.auth.login(TESTING_ACCOUNTS[0].id, 'DemoPass123!')).user.id, sessions[0].user.id)
     assert.equal((await application.games.state(host.game_id)).code, host.code)
-    assert.equal((await db.query<{ count: number }>('SELECT count(*)::int AS count FROM users')).rows[0].count, 25)
+    assert.equal((await db.query<{ count: number }>('SELECT count(*)::int AS count FROM users')).rows[0].count, 55)
     assert.equal(await configureTestingAccounts(db, false), undefined)
     for (let i = 0; i < TESTING_ACCOUNTS.length; i++) {
       await assert.rejects(application.auth.login(TESTING_ACCOUNTS[i].id, 'DemoPass123!'), /inactive|suspended/)
