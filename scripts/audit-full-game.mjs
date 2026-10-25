@@ -87,12 +87,11 @@ try {
   await users[2].context.setOffline(true);await users[2].page.waitForTimeout(500);await users[2].context.setOffline(false)
   await users[2].page.locator('section.player-clue').getByText(`Call #${latestBeforeReconnect.calls.length}`,{exact:true}).waitFor({timeout:20000});result.connection.push({case:'browser offline/online reconnect',recovered:true,caughtUpTo:latestBeforeReconnect.calls.length})
   while(result.calls<90)await clickDraw(result.calls+1)
-  result.fullGame={calls:result.calls,distinctNumbers:(await state(users[0],host.game_id,tokens[0].player_token)).calls.length}
-  for(const n of ticketNumbers)await users[0].page.locator(`button[title^="#${n}:"]`).click()
-  await users[0].page.waitForTimeout(1000)
+  result.fullGame={calls:result.calls,distinctNumbers:new Set((await state(users[0],host.game_id,tokens[0].player_token)).calls.map(c=>c.number)).size}
+  for(const n of ticketNumbers){const cell=users[0].page.locator(`button[title^="#${n}:"]`);if(await cell.getAttribute('aria-pressed')==='false')await cell.click()}
+  await users[0].page.getByLabel('Ticket save status').getByText('Ticket saved',{exact:true}).waitFor()
   let afterTapMarks=await state(users[0],host.game_id,tokens[0].player_token);result.manualMarkAudit={ticketCells:ticketNumbers.length,selectedImmediately:afterTapMarks.me.marked.length,selectedNumbers:afterTapMarks.me.marked}
-  for(const n of ticketNumbers)if(!afterTapMarks.me.marked.includes(n)){await users[0].page.locator(`button[title^="#${n}:"]`).click();afterTapMarks=await state(users[0],host.game_id,tokens[0].player_token)}
-  result.manualMarkAudit.selectedAfterRetry=afterTapMarks.me.marked.length
+  assert.equal(afterTapMarks.me.marked.length,15,'Every selected cell must be confirmed before claiming')
   await users[0].page.getByRole('region',{name:'Claim a pattern'}).getByRole('button',{name:/Full House/}).click();await users[0].page.getByText(/Full House accepted/).waitFor({timeout:10000});result.claims.push({fullHouse:'accepted'})
   const t2=await state(users[1],host.game_id,tokens[1].player_token);for(const n of t2.me.ticket.flat().filter(Boolean))await users[1].page.locator(`button[title^="#${n}:"]`).click()
   await users[1].page.getByRole('region',{name:'Claim a pattern'}).getByRole('button',{name:/Second House/}).click();await users[1].page.getByText(/Second House accepted/).waitFor({timeout:10000});result.claims.push({secondHouse:'accepted',gameEnded:true})
