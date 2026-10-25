@@ -16,6 +16,7 @@ const rampTargets = [1, ...supportedTargets.filter(target => target <= maxVus)]
 
 export const options = {
   setupTimeout: '15m',
+  summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'],
   stages: [
     ...rampTargets.map((target, index) => ({
       duration: index === rampTargets.length - 1 ? '1m' : '20s',
