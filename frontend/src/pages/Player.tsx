@@ -72,8 +72,8 @@ export default function PlayerScreen() {
   const cut = useMemo(() => cutSet(me), [me])
   const customBank = (state?.settings?.custom_bank as TechnicalItem[]) ?? null
 
-  const { marked: playerMarked, toggle: handleToggleCell, sync: syncMarks } = usePlayerMarks(
-    session, me, (message) => pushToast('bad', message),
+  const { marked: playerMarked, toggle: handleToggleCell, sync: syncMarks, saveStatus } = usePlayerMarks(
+    session, me, room.connection, state?.status === 'playing' || state?.status === 'closing',
   )
 
   // Revealed calls from host settings
@@ -317,6 +317,9 @@ export default function PlayerScreen() {
         onToggleCell={status === 'playing' || status === 'closing' ? handleToggleCell : undefined}
       />}
 
+      {status !== 'lobby' && <p role="status" aria-label="Ticket save status" className={`px-1 text-[10px] sm:text-xs ${saveStatus === 'saved' ? 'text-slate-400' : 'text-amber'}`}>
+        {{ saved: 'Ticket saved', saving: 'Saving ticket…', offline: 'Offline · marks saved on this device; will sync when connected', retrying: 'Ticket save pending · retrying automatically' }[saveStatus]}
+      </p>}
       {/* Players decide when to claim; no automatic pattern hints. */}
       {status === 'lobby' ? (
         <div className="rounded-xl border border-amber/50 bg-amber/10 px-4 py-3 text-center text-xs sm:text-sm text-amber flex items-center justify-center gap-2">
