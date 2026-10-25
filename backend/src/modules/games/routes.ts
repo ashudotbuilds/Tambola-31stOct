@@ -130,6 +130,7 @@ export function gameRoutes(games: GameService, claims: ClaimService, changed: (g
   router.post('/:id/claims', async (req, res) => {
     const { claim } = validate.claimBody.parse(req.body)
     const result = await claims.submit(String(req.params.id), bearer(req)!, claim)
+    res.locals.claimTelemetry = { claim, accepted: result.accepted, points: result.points }
     changed(String(req.params.id)); res.json(result)
   })
   return router

@@ -2,6 +2,7 @@ import { readConfig } from './config'
 import { postgresDatabase } from './db/database'
 import { createApplication } from './app'
 import { configureTestingAccounts } from './modules/auth/testingAccounts'
+import { createTelemetry } from './telemetry'
 
 const config = readConfig()
 const db = postgresDatabase(config.DATABASE_URL, config.DATABASE_POOL_MAX)
@@ -21,7 +22,9 @@ try {
   await db.close()
   process.exit(1)
 }
+const telemetry = createTelemetry({ projectKey: config.POSTHOG_PROJECT_KEY, host: config.POSTHOG_HOST, environment: config.NODE_ENV })
 const { server, io } = createApplication(db, {
+  telemetry,
   origins: config.origins,
   trustProxyHops: config.TRUST_PROXY_HOPS,
   bootstrapSecret: config.SUPER_ADMIN_BOOTSTRAP_SECRET,
@@ -46,6 +49,7 @@ async function shutdown() {
   io.disconnectSockets(true)
   await new Promise<void>(resolve => io.close(() => resolve()))
   await db.close()
+  await telemetry?.shutdown()
   clearTimeout(deadline)
 }
 process.on('SIGTERM', () => void shutdown())

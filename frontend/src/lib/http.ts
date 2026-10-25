@@ -1,4 +1,5 @@
 import { API_URL } from './config'
+import { captureTelemetryError, trackTelemetry } from './telemetry'
 
 async function idempotencyIdentity(method: string, path: string, body: unknown) {
   const critical = method === 'POST' && path === '/v1/admin/participants/import'
@@ -32,6 +33,10 @@ export async function request<T>(
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 20_000)
   const method = options.method ?? 'GET'
+  const started = performance.now()
+  let status = 0
+  let requestId = ''
+  const route = path.split('?')[0].replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, ':id')
   try {
     const identity = await idempotencyIdentity(method, path, options.body)
     const response = await fetch(`${API_URL}/api${path}`, {
@@ -46,6 +51,8 @@ export async function request<T>(
       body: options.body === undefined ? undefined : options.bodyFormat === 'text' ? String(options.body) : JSON.stringify(options.body),
       signal: controller.signal,
     })
+    status = response.status
+    requestId = response.headers.get('X-Request-Id') ?? ''
     const result = await response.json().catch(() => null)
     if (!response.ok || result?.ok === false) {
       const message = typeof result?.error === 'string' ? result.error : result?.error?.message
@@ -60,7 +67,14 @@ export async function request<T>(
     }
     return result as T
   } catch (error) {
+    const properties = { route, method, status_code: status, request_id: requestId, duration_ms: Math.round(performance.now() - started) }
+    trackTelemetry('api_request_failed', properties)
+    if (status === 0 || status >= 500) captureTelemetryError(new Error(`API ${method} ${route} failed`), properties)
     if (error instanceof DOMException && error.name === 'AbortError') throw new Error('The server took too long. Please try again.')
     throw error
-  } finally { clearTimeout(timeout) }
+  } finally {
+    clearTimeout(timeout)
+    const duration = Math.round(performance.now() - started)
+    if (duration >= 1000) trackTelemetry('api_request_slow', { route, method, status_code: status, duration_ms: duration, request_id: requestId })
+  }
 }

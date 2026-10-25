@@ -1,6 +1,7 @@
 import { request } from './http'
 import { sessions } from './sessions'
 import { getActiveBank } from './technicalBank'
+import { identifyTelemetry, resetTelemetry } from './telemetry'
 import type {
   AuthMeResult,
   AuthUser,
@@ -16,24 +17,30 @@ import type {
 export { sessions } from './sessions'
 
 export async function loginUser(email: string, password: string): Promise<LoginResult> {
-  return request<LoginResult>('/v1/auth/login', {
+  const result = await request<LoginResult>('/v1/auth/login', {
     method: 'POST',
     body: { email, password },
   })
+  identifyTelemetry(result.user, result.principal.type)
+  return result
 }
 
 export async function logoutUser(token?: string): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>('/v1/auth/logout', {
+  const result = await request<{ ok: boolean }>('/v1/auth/logout', {
     method: 'POST',
     token,
   })
+  resetTelemetry()
+  return result
 }
 
 export async function getCurrentUser(token?: string): Promise<AuthMeResult> {
-  return request<AuthMeResult>('/v1/auth/me', {
+  const result = await request<AuthMeResult>('/v1/auth/me', {
     method: 'GET',
     token,
   })
+  identifyTelemetry(result.user, result.principal.type)
+  return result
 }
 
 export async function bootstrapSuperAdmin(

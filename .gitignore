@@ -1,4 +1,5 @@
 node_modules/
+**/.posthog-wizard-cache/
 .next/
 out/
 build/

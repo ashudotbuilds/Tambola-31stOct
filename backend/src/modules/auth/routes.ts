@@ -112,6 +112,8 @@ export function authRoutes(auth: AuthService) {
       })
 
       // Set HttpOnly session cookie
+      res.locals.telemetryUserId = result.user.id
+      res.locals.telemetryRole = result.principal.type
       res.cookie('tt_session', result.token, {
         ...sessionCookie(req),
         maxAge: 7 * 24 * 60 * 60 * 1000,

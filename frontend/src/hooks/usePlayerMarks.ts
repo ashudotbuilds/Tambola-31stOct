@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { setPlayerMarks } from '@/lib/api'
 import { MarkSaver, type MarkSaveStatus } from '@/lib/markSaver'
 import { play } from '@/lib/sound'
+import { trackTelemetry } from '@/lib/telemetry'
 import type { GameState, PlayerSession } from '@/lib/types'
 
 /** Manual marks stay instant. Only unsaved snapshots are stored on this device. */
@@ -29,7 +30,10 @@ export function usePlayerMarks(session: PlayerSession | null, me: GameState['me'
     const writer = new MarkSaver({
       send: values => setPlayerMarks(session.game_id, session.player_token, values),
       online: () => navigator.onLine,
-      status: value => { if (active) setSaveStatus(value) },
+      status: value => {
+        if (active) setSaveStatus(value)
+        if (value === 'offline' || value === 'retrying') trackTelemetry('ticket_save_pending', { game_id: session.game_id, reason: value })
+      },
       saved: values => {
         try { if (localStorage.getItem(draftKey) === JSON.stringify(values)) localStorage.removeItem(draftKey) } catch { /* Optional local recovery. */ }
       },

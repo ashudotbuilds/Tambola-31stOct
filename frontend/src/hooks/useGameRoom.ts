@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { API_URL, SOCKET_OPTIONS } from '@/lib/config'
 import { getGameState, getGameUpdates } from '@/lib/api'
+import { trackTelemetry } from '@/lib/telemetry'
 import type { CallRow, ClaimResultEvent, ClaimType, GameState, NumberCalledEvent, StatusChangedEvent, TicketUpdatedEvent } from '@/lib/types'
 
 export type Connection = 'connecting' | 'live' | 'offline'
@@ -84,8 +85,15 @@ export function useGameRoom(gameId: string | null, token: string | null | undefi
     void load(true)
     const socket = io(API_URL, { ...SOCKET_OPTIONS, withCredentials: true, auth: { gameId, ...(token ? { token } : {}) } })
     socket.on('connect', () => setConnection('connecting'))
-    socket.on('room_ready', () => { live = true; setConnection('live'); void load(roomSeen); roomSeen = true })
-    socket.on('disconnect', () => { live = false; setConnection('offline') })
+    socket.on('room_ready', () => {
+      live = true; setConnection('live')
+      trackTelemetry(roomSeen ? 'game_room_reconnected' : 'game_room_connected', { game_id: gameId })
+      void load(roomSeen); roomSeen = true
+    })
+    socket.on('disconnect', reason => {
+      live = false; setConnection('offline')
+      trackTelemetry('game_room_disconnected', { game_id: gameId, reason })
+    })
     socket.on('connect_error', () => { live = false; setConnection('offline') })
     socket.on('presence', (count: number) => setConnected(count))
     socket.on('game_changed', (event?: { full?: boolean }) => { void load(event?.full) })

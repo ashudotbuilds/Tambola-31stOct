@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 
 // Each deploy folder owns its source and dependencies. Keep these intentionally
 // mirrored contracts/rules identical without a cross-folder build dependency.
-const names = ['types.ts', 'claims.ts', 'bank.ts']
+const names = ['types.ts', 'claims.ts', 'bank.ts', 'telemetryPrivacy.ts']
 const checking = process.argv.includes('--check')
 for (const name of names) {
   const source = new URL(`../backend/src/shared/${name}`, import.meta.url)

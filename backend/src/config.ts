@@ -20,6 +20,8 @@ const schema = z.object({
   EMAIL_API_URL: z.string().url().optional(),
   EMAIL_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().email().optional(),
+  POSTHOG_PROJECT_KEY: z.preprocess(value => value === '' ? undefined : value, z.string().regex(/^phc_[a-zA-Z0-9_-]+$/).optional()),
+  POSTHOG_HOST: z.enum(['https://us.i.posthog.com', 'https://eu.i.posthog.com']).default('https://us.i.posthog.com'),
 })
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {

@@ -21,17 +21,35 @@ import { EmailAdapter, type EmailOptions } from './modules/email/adapter'
 import { OperationsService } from './modules/operations/service'
 import { adminOperationsRoutes, superAdminOperationsRoutes } from './modules/operations/routes'
 import { parse as parseCookies } from 'cookie'
+import type { ServerTelemetry } from './telemetry'
 
 export function createApplication(
   db: Database,
-  options: { origins: string[]; trustProxyHops?: number; bootstrapSecret?: string; email?: EmailOptions; demoAccounts?: Array<{ id: string; name: string; email: string; role: string }> },
+  options: { origins: string[]; trustProxyHops?: number; bootstrapSecret?: string; email?: EmailOptions; telemetry?: ServerTelemetry; demoAccounts?: Array<{ id: string; name: string; email: string; role: string }> },
 ) {
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', options.trustProxyHops ?? 0)
-  app.use((_req, res, next) => {
+  app.use((req, res, next) => {
     res.locals.requestId = randomUUID()
     res.setHeader('X-Request-Id', res.locals.requestId)
+    if (options.telemetry) {
+      const started = performance.now()
+      res.on('finish', () => {
+        const duration = Math.round(performance.now() - started)
+        const path = req.originalUrl.split('?')[0]
+        if (!path.startsWith('/api/') || (req.method === 'GET' && res.statusCode < 400 && duration < 1000)) return
+        try { options.telemetry?.request({
+          request_id: String(res.locals.requestId), method: req.method,
+          route: path.replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, ':id'),
+          status_code: res.statusCode, duration_ms: duration,
+          user_id: req.auth?.user.id ?? res.locals.telemetryUserId,
+          role: req.auth?.principal.type ?? res.locals.telemetryRole,
+          game_id: /^\/api\/games\/([a-f0-9-]{36})(?:\/|$)/i.exec(path)?.[1],
+          ...res.locals.claimTelemetry,
+        }) } catch { /* Telemetry must not affect HTTP responses. */ }
+      })
+    }
     next()
   })
   app.use(helmet())
@@ -41,6 +59,7 @@ export function createApplication(
       else callback(new AppError(403, 'Origin is not allowed'))
     },
     credentials: true,
+    exposedHeaders: ['X-Request-Id'],
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'HEAD'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-bootstrap-secret', 'Idempotency-Key'],
   }))
@@ -137,6 +156,7 @@ export function createApplication(
     } else {
       // Avoid logging query parameters, request bodies, or connection strings.
       console.error('Request failed', { requestId, code: error?.code ?? 'unknown' })
+      try { options.telemetry?.exception(error, { request_id: requestId, user_id: req.auth?.user.id }) } catch { /* Optional diagnostics. */ }
       send(500, 'INTERNAL_ERROR', 'Something went wrong. Please try again.')
     }
   }
