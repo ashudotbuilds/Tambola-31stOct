@@ -4,7 +4,7 @@ import { AppError } from '../../errors'
 import { hashPassword } from './password'
 import { createUser, findUserByEmail, recordAudit } from './repository'
 
-export const LOAD_TEST_ACCOUNT_COUNT = 100
+export const LOAD_TEST_ACCOUNT_COUNT = 500
 const LOAD_TEST_ACCOUNT_IDS = Array.from({ length: LOAD_TEST_ACCOUNT_COUNT }, (_, index) =>
   `tt-load-user${String(index + 1).padStart(4, '0')}`)
 const DIRECTORY_ID = '00000000-0000-4000-8000-000000000001'

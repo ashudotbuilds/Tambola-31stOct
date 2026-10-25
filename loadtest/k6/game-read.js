@@ -7,7 +7,7 @@ const adminLogin = __ENV.ADMIN_LOGIN
 const adminPassword = __ENV.ADMIN_PASSWORD
 const loadTestPassword = __ENV.LOAD_TEST_PASSWORD
 const maxVus = Number(__ENV.MAX_VUS || 100)
-const supportedTargets = [10, 15, 20, 50, 100]
+const supportedTargets = [10, 15, 20, 50, 100, 500]
 if (!supportedTargets.includes(maxVus)) {
   throw new Error(`MAX_VUS must be one of: ${supportedTargets.join(', ')}`)
 }
@@ -15,7 +15,7 @@ if (!supportedTargets.includes(maxVus)) {
 const rampTargets = [1, ...supportedTargets.filter(target => target <= maxVus)]
 
 export const options = {
-  setupTimeout: '15m',
+  setupTimeout: '55m',
   summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'],
   stages: [
     ...rampTargets.map((target, index) => ({
@@ -101,6 +101,8 @@ export function setup() {
 
   try {
     participants.forEach((participant, index) => {
+      // Stay below the API's 150 joins/minute per-IP limit.
+      if (index > 0) sleep(0.5)
       const name = `Load ${String(index + 1).padStart(4, '0')}`
       clearCookies()
       const joined = http.post(`${baseUrl}/api/games/join`, JSON.stringify({ code: game.code, name }),

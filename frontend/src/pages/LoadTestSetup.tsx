@@ -24,7 +24,7 @@ export default function LoadTestSetup() {
   }
 
   async function disable() {
-    if (!window.confirm('Suspend the 100 load-test accounts and revoke their active sessions?')) return
+    if (!window.confirm('Suspend the 500 load-test accounts and revoke their active sessions?')) return
     setBusy(true); setFailure(null); setMessage(null); setPassword(null)
     try {
       const result = await request<{ disabled: number }>('/v1/super-admin/load-test/accounts', { method: 'DELETE' })
@@ -43,8 +43,8 @@ export default function LoadTestSetup() {
   return <AdminPage account={account} error={error} title="Load test setup" description="Prepare isolated participant accounts for the authenticated k6 game test.">
     <section className="card space-y-5 p-5 sm:p-6">
       <div>
-        <h2 className="text-xl font-bold">100 load-test accounts</h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-400">Creates or resets <code>tt-load-user0001</code> through <code>tt-load-user0100</code>. The k6 scenario uses your Super Admin account as the host and up to 99 of these participants, matching the game's 100-seat limit.</p>
+        <h2 className="text-xl font-bold">500 load-test accounts</h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-400">Creates or resets <code>tt-load-user0001</code> through <code>tt-load-user0500</code>. The k6 scenario uses your Super Admin account as the host and up to 499 participants in one 500-seat game.</p>
       </div>
       <div className="flex flex-wrap gap-3">
         <button className="btn btn-primary" type="button" disabled={busy} onClick={() => void provision()}>{busy ? 'Working…' : 'Create / reset accounts'}</button>
@@ -67,7 +67,7 @@ $env:ADMIN_PASSWORD = Read-Host 'Super Admin password' -AsSecureString | Convert
 $env:LOAD_TEST_PASSWORD = Read-Host 'Generated load-test password' -AsSecureString | ConvertFrom-SecureString -AsPlainText
 $env:MAX_VUS = '10'
 k6 run .\\loadtest\\k6\\game-read.js`}</code></pre>
-      <p className="text-sm text-slate-400">Run maximums 10, 15, 20, 50, then 100. Setup signs in each account slowly to stay within the API login limit, so a 100-user run takes about seven minutes to prepare before its load ramp.</p>
+      <p className="text-sm text-slate-400">Run maximums 10, 15, 20, 50, 100, then 500. Setup signs in each account slowly to stay within the API login limit; preparing a 500-user run takes about 40 minutes before its load ramp.</p>
       <p className="text-sm text-slate-400">The script removes its temporary game afterward. Disable the accounts here when testing is finished. This exercises authenticated HTTP polling; it does not simulate Socket.IO connections or real browser rendering.</p>
     </section>
   </AdminPage>

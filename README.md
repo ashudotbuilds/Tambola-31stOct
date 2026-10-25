@@ -189,7 +189,7 @@ numbers, excluding cells cut by penalties. Extra uncalled marks never count.
 A wrong claim deducts 10 points, with a floor of zero, and cuts one selected
 number if available. Losing a valid claim race causes no penalty. Closing ends
 at Second Full House or ten additional calls. Pause/resume remembers whether the
-game was playing or closing. The default capacity is 100 people including the host.
+game was playing or closing. New games have a capacity of 500 people including the host.
 
 Hosts can search, import, edit, reset, and export the 90-item question bank.
 Imports accept JSON or delimited lines such as `Term | Clue`; short imports fill

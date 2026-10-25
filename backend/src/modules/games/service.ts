@@ -17,7 +17,7 @@ export class GameService {
     const playerToken = newToken()
     const settings: Settings = {
       points: DEFAULT_POINTS, wrong_claim_penalty: 0, close_after_calls: 10,
-      max_players: 100, reveal_seconds: 3, pause_after_calls: 4,
+      max_players: 500, reveal_seconds: 3, pause_after_calls: 4,
       revealed_seqs: [], question_batch_start: 1, custom_bank: bank,
     }
     return this.db.transaction(async db => {
@@ -84,7 +84,7 @@ export class GameService {
       const { rows: [{ count }] } = await db.query<{ count: number }>(
         'SELECT count(*)::int AS count FROM game_players WHERE game_id = $1', [game.id],
       )
-      ensure(count < (game.settings.max_players ?? 100), 409, 'This game is full')
+      ensure(count < (game.settings.max_players ?? 500), 409, 'This game is full')
       const duplicate = await db.query('SELECT id FROM game_players WHERE game_id = $1 AND lower(display_name) = lower($2)', [game.id, name])
       ensure(!duplicate.rows.length, 409, 'That name is already taken in this game')
       const token = newToken()
