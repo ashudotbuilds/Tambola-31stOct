@@ -6,7 +6,7 @@
   "scripts": {
     "dev:demo": "tsx test/demo-server.ts",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc --noEmit && tsup",
+    "build": "tsc --noEmit && tsup && node scripts/upload-sourcemaps.mjs",
     "start": "npm run db:migrate:prod && node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && tsx --test test/*.test.ts",
@@ -14,7 +14,8 @@
     "db:migrate:prod": "node dist/migrate.js",
     "db:status": "tsx src/db/migrate.ts --status",
     "test:browser": "tsx test/browser-server.ts",
-    "posthog:verify": "tsx scripts/verify-posthog.ts"
+    "posthog:verify": "tsx scripts/verify-posthog.ts",
+    "posthog:verify:errors": "tsx scripts/verify-posthog-errors.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.0",
+    "@posthog/cli": "^0.18.12",
     "@types/cookie": "^0.6.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.2",

@@ -30,4 +30,20 @@ try {
   }
   assert.deepEqual(errors, [])
   console.log(JSON.stringify({ accepted: true, status: accepted.status(), host: new URL(accepted.url()).hostname, browserErrors: errors }))
+  if (process.env.POSTHOG_VERIFY_ERRORS === 'true') {
+    for (const kind of ['error', 'unhandledrejection']) {
+      const exceptionResponse = page.waitForResponse(response => {
+        const url = new URL(response.url())
+        return ['us.i.posthog.com', 'eu.i.posthog.com'].includes(url.hostname) && response.request().method() === 'POST' && response.ok()
+      }, { timeout: 20_000 })
+      await page.evaluate(kind => {
+        const error = new Error(`Tambola ${kind} installation check — intentional test exception`)
+        window.dispatchEvent(kind === 'error'
+          ? new ErrorEvent('error', { error, message: error.message })
+          : new PromiseRejectionEvent('unhandledrejection', { promise: Promise.resolve(), reason: error }))
+      }, kind)
+      const response = await exceptionResponse
+      console.log(JSON.stringify({ source: kind, accepted: true, status: response.status() }))
+    }
+  }
 } finally { await browser.close() }

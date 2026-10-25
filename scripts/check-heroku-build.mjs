@@ -24,7 +24,8 @@ async function run(args) {
 try {
   for (const path of ['package.json', 'package-lock.json', 'Procfile', 'app.json',
     'scripts/sync-shared.mjs', 'backend/package.json', 'backend/package-lock.json',
-    'backend/tsconfig.json', 'backend/tsup.config.ts', 'backend/src', 'backend/migrations', 'frontend/src/shared']) {
+    'backend/tsconfig.json', 'backend/tsup.config.ts', 'backend/scripts/upload-sourcemaps.mjs',
+    'backend/src', 'backend/migrations', 'frontend/src/shared']) {
     const destination = join(workspace, path)
     await mkdir(dirname(destination), { recursive: true })
     await cp(join(root, path), destination, { recursive: true })

@@ -50,6 +50,41 @@ failed requests, and requests taking at least one second are logged. Both export
 use bounded background batches; they are diagnostic copies, not durable audit
 storage. The backend flushes its queues during graceful shutdown.
 
+## Error tracking and source maps
+
+Browser uncaught errors and unhandled rejections are captured once by the app's
+central listeners. Unexpected API exceptions use the same privacy filtering.
+Run `npm --prefix backend run posthog:verify:errors` to send one explicitly labeled
+test exception through the actual backend integration and check HTTP acceptance.
+Dashboard processing may take longer than the ingestion response.
+For the local browser check described above, set `POSTHOG_VERIFY_ERRORS=true` to
+also exercise both global browser exception listeners with intentional test errors.
+
+Both apps support optional source-map uploads during their independent builds.
+Set these **private build variables** on Vercel and Render/Heroku:
+
+| Variable | Value |
+| --- | --- |
+| `POSTHOG_CLI_API_KEY` | Personal key with error tracking write and organization read scopes |
+| `POSTHOG_CLI_PROJECT_ID` | `687005` |
+| `POSTHOG_CLI_HOST` | `https://us.posthog.com` (EU: `https://eu.posthog.com`) |
+| `POSTHOG_RELEASE_VERSION` | Optional commit SHA override; deployment commit variables are used when available |
+
+Never put the private upload key in a `VITE_` variable. It is distinct from the
+public runtime project token. With the key unset, normal builds skip uploads.
+With it set, failed uploads fail the build so an unverified artifact is not
+deployed. Source maps are deleted after successful upload; the deployed JavaScript
+retains PostHog's chunk identifiers. Releases are named `tambola-web` and
+`tambola-api`. Check the project's Error Tracking symbol sets after deployment.
+Heroku installs the CLI only during build, before pruning development packages.
+
+The wizard can display a browser success page before exchanging the OAuth code.
+If its log reports `invalid_grant`, that wizard run did not authenticate even if
+the browser says login is complete. The SDK setup does not depend on wizard OAuth.
+
+See PostHog's [Vite source maps](https://posthog.com/docs/error-tracking/upload-source-maps/vite)
+and [Node source maps](https://posthog.com/docs/error-tracking/upload-source-maps/node).
+
 ## Privacy and MCP
 
 Autocapture, session recording, surveys, and automatic feature-flag polling are

@@ -22,6 +22,7 @@
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
+    "@posthog/rollup-plugin": "^1.6.2",
     "@types/node": "^22.10.7",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.0.7",
